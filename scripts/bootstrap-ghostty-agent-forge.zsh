@@ -198,7 +198,9 @@ if ! command -v brew >/dev/null 2>&1; then
   fi
 fi
 
-eval "$((cd "$HOME" && brew shellenv) 2>/dev/null)"
+eval "$(
+  (cd "$HOME" && brew shellenv) 2>/dev/null
+)"
 
 FORMULAE=(
   spaceship
@@ -247,9 +249,13 @@ if [[ -d "$HOME/.orbstack/bin" ]]; then
 fi
 
 if [[ -x /opt/homebrew/bin/brew ]]; then
-  eval "$((cd "$HOME" && /opt/homebrew/bin/brew shellenv) 2>/dev/null)"
+  eval "$(
+    (cd "$HOME" && /opt/homebrew/bin/brew shellenv) 2>/dev/null
+  )"
 elif [[ -x /usr/local/bin/brew ]]; then
-  eval "$((cd "$HOME" && /usr/local/bin/brew shellenv) 2>/dev/null)"
+  eval "$(
+    (cd "$HOME" && /usr/local/bin/brew shellenv) 2>/dev/null
+  )"
 fi
 
 source "$HOME/.orbstack/shell/init.zsh" 2>/dev/null || true
@@ -347,4 +353,3 @@ fi
 log "complete"
 log "backup dir: $BACKUP_DIR"
 log "restart current shell with: exec zsh -l"
-
