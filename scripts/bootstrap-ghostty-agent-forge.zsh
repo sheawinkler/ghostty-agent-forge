@@ -185,7 +185,7 @@ REPO_ROOT="${SCRIPT_DIR:h}"
 STAMP="$(date +%Y%m%d%H%M%S)"
 BACKUP_DIR="$HOME/.zsh_backups/ghostty-agent-forge-$STAMP"
 
-run mkdir -p "$BACKUP_DIR" "$CONFIG_ROOT/zsh" "$HOME/.cache/zsh"
+run mkdir -p "$BACKUP_DIR" "$CONFIG_ROOT/bin" "$CONFIG_ROOT/config" "$CONFIG_ROOT/scripts" "$CONFIG_ROOT/zsh" "$HOME/.cache/zsh" "$HOME/.local/bin"
 [[ -f "$HOME/.zprofile" ]] && run cp -p "$HOME/.zprofile" "$BACKUP_DIR/.zprofile"
 [[ -f "$HOME/.zshrc" ]] && run cp -p "$HOME/.zshrc" "$BACKUP_DIR/.zshrc"
 
@@ -213,6 +213,8 @@ FORMULAE=(
   fd
   ripgrep
   docker-completion
+  jq
+  gh
 )
 
 run brew install "${FORMULAE[@]}"
@@ -228,6 +230,14 @@ fi
 for module in completion post-omz contextlattice tools prompt-spaceship late-widgets; do
   write_file "$CONFIG_ROOT/zsh/$module.zsh" "$REPO_ROOT/zsh/$module.zsh"
 done
+
+write_file "$CONFIG_ROOT/bin/gaf" "$REPO_ROOT/bin/gaf"
+write_file "$CONFIG_ROOT/agent-runtime.json" "$REPO_ROOT/config/agent-runtime.json"
+for helper in bootstrap-ghostty-agent-forge contextlattice-preflight macos-tcc-doctor; do
+  write_file "$CONFIG_ROOT/scripts/$helper.zsh" "$REPO_ROOT/scripts/$helper.zsh"
+done
+run chmod +x "$CONFIG_ROOT/bin/gaf" "$CONFIG_ROOT/scripts/bootstrap-ghostty-agent-forge.zsh" "$CONFIG_ROOT/scripts/contextlattice-preflight.zsh" "$CONFIG_ROOT/scripts/macos-tcc-doctor.zsh"
+run ln -sf "$CONFIG_ROOT/bin/gaf" "$HOME/.local/bin/gaf"
 
 touch "$HOME/.zprofile" "$HOME/.zshrc"
 
