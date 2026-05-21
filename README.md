@@ -58,12 +58,21 @@ To explicitly clone the free public ContextLattice repo:
 ./scripts/bootstrap-ghostty-agent-forge.zsh --install-contextlattice
 ```
 
+After install, the `gaf` CLI is available from `~/.local/bin/gaf`:
+
+```zsh
+gaf doctor
+gaf memory preflight
+gaf bench 5
+gaf rules
+```
+
 ## Installed Tool Stack
 
 The bootstrap installs:
 
 ```zsh
-brew install spaceship fzf fzf-tab zsh-autosuggestions zsh-syntax-highlighting zoxide direnv fd ripgrep docker-completion
+brew install spaceship fzf fzf-tab zsh-autosuggestions zsh-syntax-highlighting zoxide direnv fd ripgrep docker-completion jq gh
 ```
 
 It can optionally install:
@@ -108,6 +117,27 @@ The `contextlattice.zsh` module adds:
 
 These helpers are intentionally lightweight. They should not start services, reset permissions, or mutate memory unless explicitly invoked.
 
+## Agent Control Plane
+
+Ghostty Agent Forge ships a small local CLI:
+
+```zsh
+gaf doctor                 # shell/tool/TCC/ContextLattice/resource checks
+gaf ensure --yes           # install missing required Homebrew formulae
+gaf bench 5                # zsh startup benchmark
+gaf blackbox -- <command>  # run command with local JSONL telemetry
+gaf profile export         # export machine capability profile
+gaf rules                  # print the agent runtime contract
+```
+
+Runtime contract:
+
+```text
+config/agent-runtime.json
+```
+
+The contract defines shell modes, expected tools, ContextLattice defaults, safety rules, and observability locations. Agents can read it without scanning the whole repo.
+
 ## Verification
 
 After installation, run:
@@ -119,6 +149,7 @@ zsh -ic 'print START_OK; print $SPACESHIP_VERSION'
 zsh -ic 'whence -w _brew _docker _cargo _uv _pnpm _rg _fd _gh _zoxide'
 zsh -ic 'autoload -Uz compaudit; compaudit'
 for i in {1..5}; do /usr/bin/time -p zsh -ic exit; done
+tests/smoke.zsh
 ```
 
 Warm startup target: under `500ms`.
@@ -142,6 +173,10 @@ ghostty-agent-forge/
     bootstrap-ghostty-agent-forge.zsh
     contextlattice-preflight.zsh
     macos-tcc-doctor.zsh
+  bin/
+    gaf
+  config/
+    agent-runtime.json
   zsh/
     completion.zsh
     post-omz.zsh
@@ -151,11 +186,15 @@ ghostty-agent-forge/
     late-widgets.zsh
   docs/
     agent-shell-rules.md
+    agent-runtime-contract.md
     contextlattice-integration.md
+    flight-recorder.md
     macos-tcc-fda.md
+    repo-governance.md
+  tests/
+    smoke.zsh
 ```
 
 ## License
 
 MIT
-

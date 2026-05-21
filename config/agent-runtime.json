@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "name": "ghostty-agent-forge",
+  "display_name": "Ghostty Agent Forge by ContextLattice",
+  "purpose": "Terminal visibility, zsh/Homebrew bootstrap, and ContextLattice hooks for local AI agents on macOS.",
+  "platform": {
+    "os": "macOS",
+    "shell": "zsh",
+    "terminal": "Ghostty",
+    "package_manager": "Homebrew"
+  },
+  "contextlattice": {
+    "public_repo": "https://github.com/sheawinkler/ContextLattice",
+    "orchestrator_url_default": "http://127.0.0.1:8075",
+    "required_env": {
+      "CONTEXTLATTICE_ORCHESTRATOR_URL": "http://127.0.0.1:8075",
+      "MEMMCP_ORCHESTRATOR_URL": "http://127.0.0.1:8075",
+      "CONTEXTLATTICE_AGENT_ID": "stable agent identity",
+      "MEMMCP_AGENT_ID": "stable agent identity"
+    },
+    "recommended_preflight": "gaf memory preflight",
+    "degraded_mode_rule": "If ContextLattice is unreachable, continue from local evidence and report degraded-memory mode."
+  },
+  "capabilities": {
+    "doctor": "gaf doctor",
+    "ensure": "gaf ensure --yes",
+    "startup_benchmark": "gaf bench 5",
+    "flight_recorder": "gaf blackbox -- <command>",
+    "memory_search": "gaf memory search <query> [project] [topic_path]",
+    "memory_write": "gaf memory write <file> <content> [project] [topic_path]",
+    "runtime_contract": "gaf rules",
+    "profile_export": "gaf profile export",
+    "tcc_doctor": "gaf tcc"
+  },
+  "shell_modes": {
+    "human_interactive": {
+      "loads": [
+        "completion UI",
+        "fzf widgets",
+        "prompt",
+        "autosuggestions",
+        "syntax highlighting",
+        "ContextLattice helpers"
+      ],
+      "must_have": [
+        "TTY",
+        "ZLE-safe widgets only after compinit"
+      ]
+    },
+    "agent_noninteractive": {
+      "loads": [
+        "PATH floor",
+        "Homebrew shellenv",
+        "ContextLattice env",
+        "lightweight tool hooks"
+      ],
+      "must_not_load": [
+        "interactive prompts",
+        "ZLE-only widgets",
+        "blocking update checks"
+      ]
+    },
+    "launchd_background": {
+      "loads": [
+        "absolute paths",
+        "explicit env",
+        "no implicit cwd assumptions"
+      ],
+      "must_not_load": [
+        "terminal UI",
+        "keychain prompts",
+        "interactive sudo"
+      ]
+    },
+    "ssh_remote": {
+      "loads": [
+        "minimal completion",
+        "bounded memory checks"
+      ],
+      "must_not_load": [
+        "macOS UI automation",
+        "local-only app assumptions"
+      ]
+    }
+  },
+  "required_formulae": [
+    "spaceship",
+    "fzf",
+    "fzf-tab",
+    "zsh-autosuggestions",
+    "zsh-syntax-highlighting",
+    "zoxide",
+    "direnv",
+    "fd",
+    "ripgrep",
+    "docker-completion",
+    "jq",
+    "gh"
+  ],
+  "expected_commands": [
+    "brew",
+    "gh",
+    "ghostty",
+    "jq",
+    "rg",
+    "fd",
+    "zoxide",
+    "direnv",
+    "fzf",
+    "docker",
+    "orb",
+    "python3",
+    "node",
+    "pnpm",
+    "uv",
+    "cargo",
+    "go"
+  ],
+  "safety_rules": [
+    "Do not recursively chmod or chown user data to fix macOS privacy failures.",
+    "Do not run TCC resets unless the human explicitly approves them.",
+    "Do not load ZLE widgets in non-interactive shells.",
+    "Do not start ContextLattice services implicitly from shell startup.",
+    "Do not hide degraded memory, missing tools, failing startup, or permission blocks.",
+    "Use direct command evidence before claiming a tool, repo, or permission state is fixed."
+  ],
+  "observability": {
+    "blackbox_log": "~/.local/state/ghostty-agent-forge/blackbox.jsonl",
+    "profile_export": "~/.local/state/ghostty-agent-forge/profile.json",
+    "startup_target_ms_warm": 500
+  }
+}
