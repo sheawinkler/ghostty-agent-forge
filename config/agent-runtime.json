@@ -26,6 +26,11 @@
     "ensure": "gaf ensure --yes",
     "startup_benchmark": "gaf bench 5",
     "flight_recorder": "gaf blackbox -- <command>",
+    "resource_status": "gaf resources status",
+    "resource_snapshot": "gaf resources snapshot --append",
+    "resource_tool_audit": "gaf resources tools",
+    "resource_hotspots": "gaf resources hotspots ~/Documents /Volumes/wd_black",
+    "resource_monitor_launch_agent": "gaf resources install-agent --load",
     "memory_search": "gaf memory search <query> [project] [topic_path]",
     "memory_write": "gaf memory write <file> <content> [project] [topic_path]",
     "runtime_contract": "gaf rules",
@@ -97,6 +102,22 @@
     "jq",
     "gh"
   ],
+  "resource_formulae": [
+    "btop",
+    "procs",
+    "smartmontools",
+    "dust",
+    "dua-cli",
+    "dysk",
+    "ncdu",
+    "gdu",
+    "gdu-go",
+    "rclone",
+    "restic",
+    "watchman",
+    "hyperfine",
+    "yq"
+  ],
   "expected_commands": [
     "brew",
     "gh",
@@ -116,6 +137,26 @@
     "cargo",
     "go"
   ],
+  "resource_commands": [
+    "btop",
+    "procs",
+    "smartctl",
+    "dust",
+    "dua",
+    "dysk",
+    "ncdu",
+    "gdu",
+    "rclone",
+    "restic",
+    "watchman",
+    "hyperfine",
+    "yq",
+    "lsof",
+    "iostat",
+    "fs_usage",
+    "iotop",
+    "powermetrics"
+  ],
   "safety_rules": [
     "Do not recursively chmod or chown user data to fix macOS privacy failures.",
     "Do not run TCC resets unless the human explicitly approves them.",
@@ -126,6 +167,11 @@
   ],
   "observability": {
     "blackbox_log": "~/.local/state/ghostty-agent-forge/blackbox.jsonl",
+    "resource_snapshot_log": "/Volumes/wd_black/ghostty-agent-forge/resource-monitor/resource-snapshots-YYYYMMDD.jsonl",
+    "resource_snapshot_fallback": "~/.local/state/ghostty-agent-forge/resources/resource-snapshots-YYYYMMDD.jsonl",
+    "resource_snapshot_interval_secs": 300,
+    "resource_internal_free_warn_gib": 40,
+    "resource_external_free_warn_gib": 250,
     "profile_export": "~/.local/state/ghostty-agent-forge/profile.json",
     "startup_target_ms_warm": 500
   }

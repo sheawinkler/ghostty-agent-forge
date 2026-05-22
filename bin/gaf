@@ -37,6 +37,22 @@ FORMULAE=(
   gh
 )
 
+RESOURCE_FORMULAE=(
+  btop
+  procs
+  smartmontools
+  dust
+  dua-cli
+  dysk
+  ncdu
+  gdu
+  rclone
+  restic
+  watchman
+  hyperfine
+  yq
+)
+
 COMMANDS=(
   brew
   gh
@@ -57,6 +73,32 @@ COMMANDS=(
   go
 )
 
+RESOURCE_COMMANDS=(
+  btop
+  procs
+  smartctl
+  dust
+  dua
+  dysk
+  ncdu
+  gdu
+  gdu-go
+  rclone
+  restic
+  watchman
+  hyperfine
+  yq
+  lsof
+  iostat
+  fs_usage
+  iotop
+  powermetrics
+)
+
+RESOURCE_LAUNCH_AGENT_ID="com.contextlattice.ghostty-agent-forge.resources"
+RESOURCE_INTERVAL_SECS="${GAF_RESOURCE_INTERVAL_SECS:-300}"
+RESOURCE_LOG_DIR="${GAF_RESOURCE_LOG_DIR:-/Volumes/wd_black/ghostty-agent-forge/resource-monitor}"
+
 usage() {
   cat <<'EOF'
 usage: gaf <command> [args]
@@ -65,6 +107,7 @@ Commands:
   doctor                 Check shell, tools, TCC symptoms, ContextLattice, resources.
   ensure [--yes]         Install missing Homebrew formulae from the forge contract.
   bench [runs]           Benchmark interactive zsh startup.
+  resources <subcommand> Resource toolchain, snapshots, hotspots, and LaunchAgent.
   memory <subcommand>    ContextLattice memory helper.
   blackbox -- <cmd...>   Run a command and append structured execution telemetry.
   profile export [path]  Export this machine's terminal capability profile.
@@ -79,6 +122,15 @@ Memory subcommands:
   memory search <query> [project] [topic_path]
   memory pack <query> [project] [topic_path]
   memory write <file> <content> [project] [topic_path]
+
+Resource subcommands:
+  resources status
+  resources snapshot [--append]
+  resources tools [--missing-only]
+  resources ensure [--yes]
+  resources hotspots [path...]
+  resources install-agent [--load] [--interval seconds] [--log-dir path]
+  resources uninstall-agent
 EOF
 }
 
@@ -99,6 +151,32 @@ print_check() {
   local label="$2"
   local value="${3:-}"
   printf "%-7s %-28s %s\n" "$check_status" "$label" "$value"
+}
+
+formula_installed() {
+  local formula="$1"
+  have_cmd brew && brew list --formula "$formula" >/dev/null 2>&1
+}
+
+install_missing_formulae() {
+  local yes="$1"
+  shift
+  have_cmd brew || { print -u2 -- "Homebrew missing. Install Homebrew first."; return 1; }
+  local missing=()
+  local formula
+  for formula in "$@"; do
+    formula_installed "$formula" || missing+=("$formula")
+  done
+  if (( ${#missing[@]} == 0 )); then
+    log "all formulae installed"
+    return 0
+  fi
+  print -r -- "Missing formulae: ${missing[*]}"
+  if (( ! yes )); then
+    print -r -- "Re-run with --yes to install."
+    return 2
+  fi
+  brew install "${missing[@]}"
 }
 
 json_escape_args() {
@@ -170,7 +248,7 @@ doctor() {
   if have_cmd brew; then
     local formula
     for formula in "${FORMULAE[@]}"; do
-      if brew list --formula "$formula" >/dev/null 2>&1; then
+      if formula_installed "$formula"; then
         print_check "ok" "$formula" "$(brew --prefix "$formula" 2>/dev/null || true)"
       else
         print_check "missing" "$formula" ""
@@ -179,6 +257,18 @@ doctor() {
   else
     print_check "missing" "brew" "cannot inspect formulae"
   fi
+
+  print
+  print "Resource toolchain"
+  local resource_cmd resource_cmd_path
+  for resource_cmd in "${RESOURCE_COMMANDS[@]}"; do
+    resource_cmd_path="$(command -v "$resource_cmd" 2>/dev/null || true)"
+    if [[ -n "$resource_cmd_path" ]]; then
+      print_check "ok" "$resource_cmd" "$resource_cmd_path"
+    else
+      print_check "missing" "$resource_cmd" ""
+    fi
+  done
 
   print
   print "Shell"
@@ -238,28 +328,403 @@ ensure() {
     esac
     shift
   done
-  have_cmd brew || { print -u2 -- "Homebrew missing. Install Homebrew first."; return 1; }
-  local missing=()
-  local formula
-  for formula in "${FORMULAE[@]}"; do
-    brew list --formula "$formula" >/dev/null 2>&1 || missing+=("$formula")
-  done
-  if (( ${#missing[@]} == 0 )); then
-    log "all required formulae installed"
-  else
-    print -r -- "Missing formulae: ${missing[*]}"
-    if (( ! yes )); then
-      print -r -- "Re-run: gaf ensure --yes"
-      return 2
-    fi
-    brew install "${missing[@]}"
-  fi
+  install_missing_formulae "$yes" "${FORMULAE[@]}"
   if [[ ! -d /Applications/Ghostty.app ]]; then
     print_check "missing" "Ghostty.app" "/Applications/Ghostty.app"
     print -r -- "Install with: brew install --cask ghostty"
   else
     print_check "ok" "Ghostty.app" "/Applications/Ghostty.app"
   fi
+}
+
+resources_tools() {
+  local missing_only=0
+  while (( $# > 0 )); do
+    case "$1" in
+      --missing-only) missing_only=1 ;;
+      *) print -u2 -- "unknown resources tools arg: $1"; return 2 ;;
+    esac
+    shift
+  done
+
+  local formula
+  for formula in "${RESOURCE_FORMULAE[@]}"; do
+    if formula_installed "$formula"; then
+      (( missing_only )) || print_check "ok" "$formula" "$(brew --prefix "$formula" 2>/dev/null || true)"
+    else
+      print_check "missing" "$formula" ""
+    fi
+  done
+
+  local cmd cmd_path
+  for cmd in "${RESOURCE_COMMANDS[@]}"; do
+    cmd_path="$(command -v "$cmd" 2>/dev/null || true)"
+    if [[ -n "$cmd_path" ]]; then
+      (( missing_only )) || print_check "ok" "$cmd" "$cmd_path"
+    else
+      print_check "missing" "$cmd" ""
+    fi
+  done
+}
+
+resources_ensure() {
+  local yes=0
+  while (( $# > 0 )); do
+    case "$1" in
+      --yes|-y) yes=1 ;;
+      *) print -u2 -- "unknown resources ensure arg: $1"; return 2 ;;
+    esac
+    shift
+  done
+  install_missing_formulae "$yes" "${RESOURCE_FORMULAE[@]}"
+}
+
+resources_snapshot() {
+  local append=0
+  while (( $# > 0 )); do
+    case "$1" in
+      --append) append=1 ;;
+      *) print -u2 -- "unknown resources snapshot arg: $1"; return 2 ;;
+    esac
+    shift
+  done
+  GAF_STATE_DIR="$GAF_STATE_DIR" GAF_RESOURCE_LOG_DIR="$RESOURCE_LOG_DIR" GAF_RESOURCE_APPEND="$append" python3 - <<'PY'
+import json
+import os
+import re
+import socket
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+
+GIB = 1024 ** 3
+
+def run(argv, timeout=5):
+    try:
+        return subprocess.run(argv, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+    except Exception as exc:
+        return subprocess.CompletedProcess(argv, 124, "", str(exc))
+
+def parse_df(targets):
+    rows = []
+    for target in targets:
+        if not Path(target).exists():
+            continue
+        proc = run(["/bin/df", "-k", target], timeout=4)
+        lines = [line for line in proc.stdout.splitlines() if line.strip()]
+        if len(lines) < 2:
+            rows.append({"target": target, "error": proc.stderr.strip() or "df_unavailable"})
+            continue
+        parts = lines[-1].split()
+        if len(parts) < 9:
+            rows.append({"target": target, "raw": lines[-1]})
+            continue
+        one_k_blocks, used, avail, capacity, mount = parts[1], parts[2], parts[3], parts[4], parts[-1]
+        rows.append({
+            "target": target,
+            "mount": mount,
+            "size_bytes": int(one_k_blocks) * 1024,
+            "used_bytes": int(used) * 1024,
+            "free_bytes": int(avail) * 1024,
+            "capacity": capacity,
+        })
+    return rows
+
+def parse_vm_stat():
+    proc = run(["/usr/bin/vm_stat"], timeout=4)
+    text = proc.stdout
+    page_size = 16384
+    match = re.search(r"page size of (\d+) bytes", text)
+    if match:
+        page_size = int(match.group(1))
+    wanted = {
+        "Pages free": "free_pages",
+        "Pages active": "active_pages",
+        "Pages inactive": "inactive_pages",
+        "Pages speculative": "speculative_pages",
+        "Pages throttled": "throttled_pages",
+        "Pages wired down": "wired_pages",
+        "Pages occupied by compressor": "compressor_pages",
+        "Pageouts": "pageouts",
+        "Swapins": "swapins",
+        "Swapouts": "swapouts",
+    }
+    out = {"page_size": page_size}
+    for line in text.splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        label = wanted.get(key.strip())
+        if not label:
+            continue
+        digits = re.sub(r"[^0-9]", "", value)
+        if digits:
+            out[label] = int(digits)
+    return out
+
+def parse_swap():
+    proc = run(["/usr/sbin/sysctl", "vm.swapusage"], timeout=4)
+    text = proc.stdout.strip()
+    values = {}
+    for key in ("total", "used", "free"):
+        match = re.search(rf"{key}\s*=\s*([0-9.]+)([MG])", text)
+        if match:
+            mult = 1024 ** 2 if match.group(2) == "M" else 1024 ** 3
+            values[f"{key}_bytes"] = int(float(match.group(1)) * mult)
+    values["raw"] = text
+    return values
+
+def parse_ps():
+    proc = run(["/bin/ps", "-axo", "pid=,ppid=,stat=,rss=,%cpu=,command="], timeout=5)
+    rows = []
+    states = {"zombie": 0, "stopped": 0, "uninterruptible": 0}
+    for raw in proc.stdout.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        parts = line.split(None, 5)
+        if len(parts) < 6:
+            continue
+        pid, ppid, stat, rss, cpu, command = parts
+        try:
+            row = {
+                "pid": int(pid),
+                "ppid": int(ppid),
+                "stat": stat,
+                "rss_bytes": int(rss) * 1024,
+                "cpu_pct": float(cpu),
+                "command": command[:220],
+            }
+        except ValueError:
+            continue
+        if "Z" in stat:
+            states["zombie"] += 1
+        if "T" in stat:
+            states["stopped"] += 1
+        if "U" in stat:
+            states["uninterruptible"] += 1
+        rows.append(row)
+    top_rss = sorted(rows, key=lambda item: item["rss_bytes"], reverse=True)[:8]
+    top_cpu = sorted(rows, key=lambda item: item["cpu_pct"], reverse=True)[:8]
+    return {"states": states, "top_rss": top_rss, "top_cpu": top_cpu}
+
+def iostat_raw():
+    proc = run(["/usr/sbin/iostat", "-d", "-K", "1", "2"], timeout=6)
+    lines = [line.rstrip() for line in proc.stdout.splitlines() if line.strip()]
+    return {"returncode": proc.returncode, "tail": lines[-6:]}
+
+disks = parse_df(["/", "/System/Volumes/Data", str(Path.home()), "/Volumes/wd_black"])
+vm = parse_vm_stat()
+swap = parse_swap()
+processes = parse_ps()
+
+warnings = []
+for disk in disks:
+    target = disk.get("target")
+    free = disk.get("free_bytes")
+    if free is None:
+        continue
+    if target in {"/", "/System/Volumes/Data", str(Path.home())} and free < 40 * GIB:
+        warnings.append(f"internal_free_below_40GiB:{target}:{round(free / GIB, 2)}GiB")
+    if target == "/Volumes/wd_black" and free < 250 * GIB:
+        warnings.append(f"external_free_below_250GiB:{round(free / GIB, 2)}GiB")
+if not Path("/Volumes/wd_black").exists():
+    warnings.append("external_volume_missing:/Volumes/wd_black")
+if swap.get("used_bytes", 0) > 4 * GIB:
+    warnings.append(f"swap_used_above_4GiB:{round(swap['used_bytes'] / GIB, 2)}GiB")
+if processes["states"]["zombie"]:
+    warnings.append(f"zombies:{processes['states']['zombie']}")
+if processes["states"]["uninterruptible"]:
+    warnings.append(f"uninterruptible_wait:{processes['states']['uninterruptible']}")
+
+record = {
+    "schema_version": 1,
+    "ts": datetime.now(timezone.utc).isoformat(),
+    "host": socket.gethostname(),
+    "disks": disks,
+    "vm_stat": vm,
+    "swap": swap,
+    "processes": processes,
+    "iostat": iostat_raw(),
+    "warnings": warnings,
+}
+
+if os.environ.get("GAF_RESOURCE_APPEND") == "1":
+    preferred = Path(os.environ["GAF_RESOURCE_LOG_DIR"]).expanduser()
+    fallback = Path(os.environ["GAF_STATE_DIR"]).expanduser() / "resources"
+    preferred_parts = preferred.parts
+    external_mount = None
+    if preferred.is_absolute() and len(preferred_parts) >= 3 and preferred_parts[1] == "Volumes":
+        external_mount = Path("/Volumes") / preferred_parts[2]
+    log_dir = preferred if external_mount and external_mount.exists() else fallback
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / f"resource-snapshots-{datetime.now(timezone.utc).strftime('%Y%m%d')}.jsonl"
+    with log_file.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+    record["appended_to"] = str(log_file)
+
+print(json.dumps(record, indent=2, sort_keys=True))
+PY
+}
+
+resources_status() {
+  local snapshot
+  snapshot="$(resources_snapshot)"
+  SNAPSHOT_JSON="$snapshot" python3 - <<'PY'
+import json
+import os
+import sys
+
+data = json.loads(os.environ["SNAPSHOT_JSON"])
+print("Ghostty Agent Forge resource status")
+for disk in data.get("disks", []):
+    free = disk.get("free_bytes")
+    used = disk.get("capacity", "?")
+    if free is None:
+        print(f"disk {disk.get('target')}: {disk.get('error', disk.get('raw', 'unavailable'))}")
+    else:
+        print(f"disk {disk.get('target')}: {used} used, {free / (1024**3):.2f} GiB free")
+swap = data.get("swap", {})
+if swap.get("used_bytes") is not None:
+    print(f"swap: {swap['used_bytes'] / (1024**3):.2f} GiB used")
+states = data.get("processes", {}).get("states", {})
+print(f"process states: zombies={states.get('zombie', 0)} stopped={states.get('stopped', 0)} uninterruptible={states.get('uninterruptible', 0)}")
+warnings = data.get("warnings", [])
+if warnings:
+    print("warnings:")
+    for warning in warnings:
+        print(f"  {warning}")
+else:
+    print("warnings: none")
+PY
+}
+
+resources_hotspots() {
+  local targets=("$@")
+  (( ${#targets[@]} > 0 )) || targets=("$HOME" "/Volumes/wd_black")
+  local target
+  for target in "${targets[@]}"; do
+    [[ -e "$target" ]] || { print_check "missing" "$target" ""; continue; }
+    print
+    print -r -- "Hotspots: $target"
+    if have_cmd gdu; then
+      gdu -d 1 "$target"
+    elif have_cmd gdu-go; then
+      gdu-go -d 1 "$target"
+    elif have_cmd dust; then
+      dust -d 1 "$target"
+    else
+      du -sh "$target"/*(N) 2>/dev/null | sort -h | tail -n 25
+    fi
+  done
+}
+
+resources_install_agent() {
+  local load=0 dry_run=0 interval="$RESOURCE_INTERVAL_SECS" log_dir="$RESOURCE_LOG_DIR"
+  while (( $# > 0 )); do
+    case "$1" in
+      --load) load=1 ;;
+      --dry-run) dry_run=1 ;;
+      --interval)
+        shift
+        interval="${1:-}"
+        [[ "$interval" == <-> ]] || { print -u2 -- "--interval must be seconds"; return 2; }
+        ;;
+      --log-dir)
+        shift
+        log_dir="${1:-}"
+        [[ -n "$log_dir" ]] || { print -u2 -- "missing path for --log-dir"; return 2; }
+        ;;
+      *) print -u2 -- "unknown install-agent arg: $1"; return 2 ;;
+    esac
+    shift
+  done
+
+  local launch_dir="$HOME/Library/LaunchAgents"
+  local plist="$launch_dir/$RESOURCE_LAUNCH_AGENT_ID.plist"
+  local gaf_bin="$GAF_ROOT/bin/gaf"
+  [[ -x "$gaf_bin" ]] || gaf_bin="$(command -v gaf 2>/dev/null || true)"
+  [[ -n "$gaf_bin" ]] || { print -u2 -- "gaf executable not found"; return 1; }
+  local launch_gaf="$GAF_HOME/bin/gaf"
+
+  if (( dry_run )); then
+    print -r -- "would write $plist"
+    print -r -- "program: $launch_gaf resources snapshot --append"
+    print -r -- "interval: $interval"
+    print -r -- "log_dir: $log_dir"
+    return 0
+  fi
+
+  mkdir -p "$launch_dir" "$GAF_STATE_DIR" "$GAF_HOME/bin"
+  cp "$gaf_bin" "$launch_gaf"
+  chmod +x "$launch_gaf"
+  gaf_bin="$launch_gaf"
+  cat > "$plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>$RESOURCE_LAUNCH_AGENT_ID</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$gaf_bin</string>
+    <string>resources</string>
+    <string>snapshot</string>
+    <string>--append</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>GAF_RESOURCE_LOG_DIR</key>
+    <string>$log_dir</string>
+    <key>GAF_STATE_DIR</key>
+    <string>$GAF_STATE_DIR</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>StartInterval</key>
+  <integer>$interval</integer>
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>Nice</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>$GAF_STATE_DIR/resource-monitor.out</string>
+  <key>StandardErrorPath</key>
+  <string>$GAF_STATE_DIR/resource-monitor.err</string>
+</dict>
+</plist>
+EOF
+  plutil -lint "$plist" >/dev/null
+  print -r -- "$plist"
+  if (( load )); then
+    launchctl bootout "gui/$UID" "$plist" >/dev/null 2>&1 || true
+    launchctl bootstrap "gui/$UID" "$plist"
+    launchctl kickstart -k "gui/$UID/$RESOURCE_LAUNCH_AGENT_ID" >/dev/null 2>&1 || true
+    log "loaded $RESOURCE_LAUNCH_AGENT_ID"
+  fi
+}
+
+resources_uninstall_agent() {
+  local plist="$HOME/Library/LaunchAgents/$RESOURCE_LAUNCH_AGENT_ID.plist"
+  launchctl bootout "gui/$UID" "$plist" >/dev/null 2>&1 || true
+  rm -f "$plist"
+  log "removed $plist"
+}
+
+resources() {
+  local sub="${1:-}"
+  shift || true
+  case "$sub" in
+    status) resources_status "$@" ;;
+    snapshot) resources_snapshot "$@" ;;
+    tools) resources_tools "$@" ;;
+    ensure) resources_ensure "$@" ;;
+    hotspots) resources_hotspots "$@" ;;
+    install-agent) resources_install_agent "$@" ;;
+    uninstall-agent) resources_uninstall_agent "$@" ;;
+    *) usage; return 2 ;;
+  esac
 }
 
 bench() {
@@ -421,6 +886,9 @@ from datetime import datetime, timezone
 commands = [
     "brew", "gh", "ghostty", "jq", "rg", "fd", "zoxide", "direnv", "fzf",
     "docker", "orb", "python3", "node", "pnpm", "uv", "cargo", "go",
+    "btop", "procs", "smartctl", "dust", "dua", "dysk", "ncdu", "gdu", "gdu-go",
+    "rclone", "restic", "watchman", "hyperfine", "yq",
+    "lsof", "iostat", "fs_usage", "iotop", "powermetrics",
 ]
 profile = {
     "schema_version": 1,
@@ -482,6 +950,7 @@ case "${1:-}" in
   doctor) shift; doctor "$@" ;;
   ensure) shift; ensure "$@" ;;
   bench) shift; bench "$@" ;;
+  resources) shift; resources "$@" ;;
   memory) shift; memory "$@" ;;
   blackbox) shift; blackbox "$@" ;;
   profile)

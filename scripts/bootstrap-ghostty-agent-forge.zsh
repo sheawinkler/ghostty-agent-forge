@@ -8,6 +8,7 @@ INSTALL_HOMEBREW=0
 INSTALL_GHOSTTY=1
 INSTALL_OH_MY_ZSH=1
 INSTALL_CONTEXTLATTICE=0
+INSTALL_RESOURCE_TOOLS=0
 CONTEXTLATTICE_PROMPT=1
 CONTEXTLATTICE_REPO_URL="${CONTEXTLATTICE_REPO_URL:-https://github.com/sheawinkler/ContextLattice.git}"
 CONTEXTLATTICE_DIR="${CONTEXTLATTICE_DIR:-$HOME/Documents/Projects/ContextLattice}"
@@ -23,6 +24,7 @@ Options:
   --no-ghostty                 Skip Ghostty cask install.
   --no-oh-my-zsh               Skip Oh My Zsh install.
   --install-contextlattice     Clone the public ContextLattice repo.
+  --resource-tools             Install resource ops formulae for heavy local workloads.
   --no-contextlattice-prompt   Do not prompt for ContextLattice install.
   --contextlattice-dir <path>  Clone ContextLattice into this path.
 
@@ -38,6 +40,7 @@ while (( $# > 0 )); do
     --no-ghostty) INSTALL_GHOSTTY=0 ;;
     --no-oh-my-zsh) INSTALL_OH_MY_ZSH=0 ;;
     --install-contextlattice) INSTALL_CONTEXTLATTICE=1 ;;
+    --resource-tools) INSTALL_RESOURCE_TOOLS=1 ;;
     --no-contextlattice-prompt) CONTEXTLATTICE_PROMPT=0 ;;
     --contextlattice-dir)
       shift
@@ -217,7 +220,26 @@ FORMULAE=(
   gh
 )
 
+RESOURCE_FORMULAE=(
+  btop
+  procs
+  smartmontools
+  dust
+  dua-cli
+  dysk
+  ncdu
+  gdu
+  rclone
+  restic
+  watchman
+  hyperfine
+  yq
+)
+
 run brew install "${FORMULAE[@]}"
+if (( INSTALL_RESOURCE_TOOLS )); then
+  run brew install "${RESOURCE_FORMULAE[@]}"
+fi
 
 if (( INSTALL_GHOSTTY )) && [[ ! -d /Applications/Ghostty.app ]]; then
   run brew install --cask ghostty

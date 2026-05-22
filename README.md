@@ -62,6 +62,8 @@ After install, the `gaf` CLI is available from `~/.local/bin/gaf`:
 
 ```zsh
 gaf doctor
+gaf resources status
+gaf resources tools --missing-only
 gaf memory preflight
 gaf bench 5
 gaf rules
@@ -80,6 +82,17 @@ It can optionally install:
 ```zsh
 brew install --cask ghostty
 ```
+
+For heavy local workloads, it can also install the resource-ops stack:
+
+```zsh
+./scripts/bootstrap-ghostty-agent-forge.zsh --resource-tools
+gaf resources ensure --yes
+```
+
+Resource tools are intentionally low-bloat and terminal-native: `btop`, `procs`,
+`smartmontools`, `dust`, `dua-cli`, `dysk`, `ncdu`, `gdu`, `rclone`, `restic`,
+`watchman`, `hyperfine`, and `yq`.
 
 ## Shell Architecture
 
@@ -124,6 +137,10 @@ Ghostty Agent Forge ships a small local CLI:
 ```zsh
 gaf doctor                 # shell/tool/TCC/ContextLattice/resource checks
 gaf ensure --yes           # install missing required Homebrew formulae
+gaf resources status       # current disk, swap, process-state, and warning snapshot
+gaf resources snapshot --append
+gaf resources hotspots ~/Documents /Volumes/wd_black
+gaf resources install-agent --load
 gaf bench 5                # zsh startup benchmark
 gaf blackbox -- <command>  # run command with local JSONL telemetry
 gaf profile export         # export machine capability profile
@@ -153,6 +170,31 @@ tests/smoke.zsh
 ```
 
 Warm startup target: under `500ms`.
+
+## Resource Ops
+
+`gaf resources` is the local-heavy-load control plane. It keeps routine monitoring
+small enough to run from launchd without becoming the workload:
+
+- `gaf resources status` prints a concise health view.
+- `gaf resources snapshot --append` writes one compact JSONL record.
+- `gaf resources hotspots` runs explicit, on-demand disk triage.
+- `gaf resources install-agent --load` installs a user LaunchAgent with
+  `LowPriorityIO`, `Nice=10`, and a default five-minute interval.
+
+Default snapshot log:
+
+```text
+/Volumes/wd_black/ghostty-agent-forge/resource-monitor/resource-snapshots-YYYYMMDD.jsonl
+```
+
+If `/Volumes/wd_black` is not mounted, snapshots fall back to:
+
+```text
+~/.local/state/ghostty-agent-forge/resources/
+```
+
+More detail: `docs/resource-ops.md`.
 
 ## Rules For Agents
 
@@ -190,6 +232,7 @@ ghostty-agent-forge/
     contextlattice-integration.md
     flight-recorder.md
     macos-tcc-fda.md
+    resource-ops.md
     repo-governance.md
   tests/
     smoke.zsh
