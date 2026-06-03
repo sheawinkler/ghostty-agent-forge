@@ -37,6 +37,55 @@
     "profile_export": "gaf profile export",
     "tcc_doctor": "gaf tcc"
   },
+  "installation_profiles": {
+    "internal-ssd": {
+      "recommended_for": [
+        "Ghostty",
+        "Homebrew",
+        "zsh modules",
+        "completions",
+        "agent launch scripts",
+        "app bundles",
+        "small fast state"
+      ],
+      "avoid_when_space_tight": [
+        "large model files",
+        "historical logs",
+        "raw telemetry archives",
+        "bulk Docker or OrbStack data",
+        "Yellowstone-style high-write pipelines"
+      ],
+      "agent_rules": [
+        "Check internal free space before installing casks, SDKs, models, build artifacts, or container images.",
+        "Treat less than 20 GiB free as degraded mode for local agents.",
+        "Do not move app bundles to symlinked external paths as a default fix."
+      ]
+    },
+    "external-ssd": {
+      "recommended_for": [
+        "large datasets",
+        "long-horizon logs",
+        "archives",
+        "backups",
+        "sealed telemetry partitions",
+        "bulk model and data stores"
+      ],
+      "avoid_for": [
+        "Ghostty.app",
+        "Homebrew",
+        "zsh startup files",
+        "core GUI app bundles",
+        "hot files that agents repeatedly scan while another pipeline writes them"
+      ],
+      "agent_rules": [
+        "Verify external mounts before assuming paths exist.",
+        "Treat missing mounts as degraded mode, not permission breakage.",
+        "Do not recursively scan external roots during active ingest unless explicitly asked.",
+        "Prefer sealed partitions, indexes, and summaries over querying hot mutable files.",
+        "Run heavy ad hoc queries with lower priority, for example nice -n 10 taskpolicy -b <query-command>."
+      ]
+    }
+  },
   "shell_modes": {
     "human_interactive": {
       "loads": [

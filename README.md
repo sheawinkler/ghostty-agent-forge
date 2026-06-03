@@ -69,6 +69,24 @@ gaf bench 5
 gaf rules
 ```
 
+## Installation Profiles
+
+Ghostty Agent Forge assumes two storage profiles:
+
+- `internal-ssd`: keep Ghostty, Homebrew, zsh modules, completions, launchers, app bundles, and small fast state local.
+- `external-ssd`: keep large data, logs, archives, backups, sealed telemetry partitions, and bulk model/data stores external.
+
+For agent-heavy machines, do not put core terminal/runtime tools on the same external path that is handling high-write ingest. A Thunderbolt or PCIe external SSD can have excellent bandwidth while still suffering from APFS metadata churn, fseventsd pressure, SQLite WAL/checkpoint contention, and page-cache thrash when live writes and heavy queries hit the same volume.
+
+High-write pipelines should use a two-lane layout:
+
+```text
+hot lane   = append-only ingest, minimal readers
+query lane = sealed partitions, indexes, summaries
+```
+
+More detail: `docs/install-storage-profiles.md`.
+
 ## Installed Tool Stack
 
 The bootstrap installs:
@@ -231,6 +249,7 @@ ghostty-agent-forge/
     agent-runtime-contract.md
     contextlattice-integration.md
     flight-recorder.md
+    install-storage-profiles.md
     macos-tcc-fda.md
     resource-ops.md
     repo-governance.md
