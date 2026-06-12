@@ -64,6 +64,8 @@ After install, the `gaf` CLI is available from `~/.local/bin/gaf`:
 gaf doctor
 gaf resources status
 gaf resources tools --missing-only
+gaf macos status
+gaf macos restore --yes
 gaf memory preflight
 gaf bench 5
 gaf rules
@@ -160,6 +162,8 @@ gaf resources snapshot --append
 gaf resources hotspots ~/Documents /Volumes/wd_black
 gaf resources install-agent --load
 gaf bench 5                # zsh startup benchmark
+gaf macos status           # post-update macOS performance drift audit
+gaf macos restore --yes    # reapply safe user-level post-update settings
 gaf blackbox -- <command>  # run command with local JSONL telemetry
 gaf profile export         # export machine capability profile
 gaf rules                  # print the agent runtime contract
@@ -213,6 +217,62 @@ If `/Volumes/wd_black` is not mounted, snapshots fall back to:
 ```
 
 More detail: `docs/resource-ops.md`.
+
+## Post-macOS Update Restore
+
+macOS updates can re-enable background services, Spotlight indexing, or power
+defaults that are bad for local agent-heavy workloads. Use the macOS restore
+lane after an OS update or if the machine suddenly starts burning CPU on system
+daemons again:
+
+```zsh
+gaf macos status
+gaf macos restore --yes
+gaf macos install-agent --yes --load
+gaf macos status
+```
+
+`gaf macos restore --yes` applies only user-level, low-risk changes:
+
+- disables selected low-value user LaunchAgents such as Weather, Siri, Photos
+  analysis, and media analysis;
+- prints the sudo-required `pmset` and Spotlight commands instead of running
+  them implicitly;
+- reports the active `codex` CLI path/version so Homebrew path shadowing is
+  visible during post-update checks.
+
+To pin the safe user-level restore across logins and future OS updates:
+
+```zsh
+gaf macos install-agent --yes --load
+```
+
+This installs `~/Library/LaunchAgents/com.contextlattice.ghostty-agent-forge.macos-restore.plist`
+with `RunAtLoad`, `StartInterval=86400`, `LowPriorityIO`, and `Nice=10`. It runs
+only:
+
+```zsh
+macos-performance-restore.zsh restore --yes
+```
+
+It does not run sudo, does not edit TCC databases, does not change Spotlight or
+`pmset`, and does not touch Codex auth state.
+
+If you want the script to apply sudo-required settings too:
+
+```zsh
+gaf macos restore --yes --system
+```
+
+System-level restore currently targets:
+
+```zsh
+sudo pmset -a powermode 2
+sudo pmset -c sleep 0 displaysleep 60 disksleep 10
+sudo pmset -b sleep 30 displaysleep 3 disksleep 10
+sudo mdutil -i off /System/Volumes/Data
+sudo mdutil -i off /
+```
 
 ## Rules For Agents
 

@@ -108,6 +108,7 @@ Commands:
   ensure [--yes]         Install missing Homebrew formulae from the forge contract.
   bench [runs]           Benchmark interactive zsh startup.
   resources <subcommand> Resource toolchain, snapshots, hotspots, and LaunchAgent.
+  macos <subcommand>     Post-update macOS performance restore/status helpers.
   memory <subcommand>    ContextLattice memory helper.
   blackbox -- <cmd...>   Run a command and append structured execution telemetry.
   profile export [path]  Export this machine's terminal capability profile.
@@ -131,6 +132,12 @@ Resource subcommands:
   resources hotspots [path...]
   resources install-agent [--load] [--interval seconds] [--log-dir path]
   resources uninstall-agent
+
+macOS subcommands:
+  macos status
+  macos restore [--yes] [--system]
+  macos install-agent [--yes] [--load]
+  macos uninstall-agent [--yes]
 EOF
 }
 
@@ -928,6 +935,18 @@ tcc() {
   fi
 }
 
+macos() {
+  local script="$GAF_ROOT/scripts/macos-performance-restore.zsh"
+  if [[ ! -x "$script" ]]; then
+    script="${GAF_BIN_DIR:h}/scripts/macos-performance-restore.zsh"
+  fi
+  if [[ ! -x "$script" ]]; then
+    script="$GAF_HOME/scripts/macos-performance-restore.zsh"
+  fi
+  [[ -x "$script" ]] || { print -u2 -- "macos-performance-restore.zsh not found"; return 1; }
+  "$script" "$@"
+}
+
 rules() {
   local contract="$GAF_ROOT/config/agent-runtime.json"
   [[ -f "$contract" ]] || contract="$GAF_HOME/agent-runtime.json"
@@ -951,6 +970,7 @@ case "${1:-}" in
   ensure) shift; ensure "$@" ;;
   bench) shift; bench "$@" ;;
   resources) shift; resources "$@" ;;
+  macos) shift; macos "$@" ;;
   memory) shift; memory "$@" ;;
   blackbox) shift; blackbox "$@" ;;
   profile)
