@@ -26,11 +26,65 @@
     "ensure": "gaf ensure --yes",
     "startup_benchmark": "gaf bench 5",
     "flight_recorder": "gaf blackbox -- <command>",
+    "resource_status": "gaf resources status",
+    "resource_snapshot": "gaf resources snapshot --append",
+    "resource_tool_audit": "gaf resources tools",
+    "resource_hotspots": "gaf resources hotspots ~/Documents /Volumes/wd_black",
+    "resource_monitor_launch_agent": "gaf resources install-agent --load",
     "memory_search": "gaf memory search <query> [project] [topic_path]",
     "memory_write": "gaf memory write <file> <content> [project] [topic_path]",
     "runtime_contract": "gaf rules",
     "profile_export": "gaf profile export",
     "tcc_doctor": "gaf tcc"
+  },
+  "installation_profiles": {
+    "internal-ssd": {
+      "recommended_for": [
+        "Ghostty",
+        "Homebrew",
+        "zsh modules",
+        "completions",
+        "agent launch scripts",
+        "app bundles",
+        "small fast state"
+      ],
+      "avoid_when_space_tight": [
+        "large model files",
+        "historical logs",
+        "raw telemetry archives",
+        "bulk Docker or OrbStack data",
+        "Yellowstone-style high-write pipelines"
+      ],
+      "agent_rules": [
+        "Check internal free space before installing casks, SDKs, models, build artifacts, or container images.",
+        "Treat less than 20 GiB free as degraded mode for local agents.",
+        "Do not move app bundles to symlinked external paths as a default fix."
+      ]
+    },
+    "external-ssd": {
+      "recommended_for": [
+        "large datasets",
+        "long-horizon logs",
+        "archives",
+        "backups",
+        "sealed telemetry partitions",
+        "bulk model and data stores"
+      ],
+      "avoid_for": [
+        "Ghostty.app",
+        "Homebrew",
+        "zsh startup files",
+        "core GUI app bundles",
+        "hot files that agents repeatedly scan while another pipeline writes them"
+      ],
+      "agent_rules": [
+        "Verify external mounts before assuming paths exist.",
+        "Treat missing mounts as degraded mode, not permission breakage.",
+        "Do not recursively scan external roots during active ingest unless explicitly asked.",
+        "Prefer sealed partitions, indexes, and summaries over querying hot mutable files.",
+        "Run heavy ad hoc queries with lower priority, for example nice -n 10 taskpolicy -b <query-command>."
+      ]
+    }
   },
   "shell_modes": {
     "human_interactive": {
@@ -97,6 +151,22 @@
     "jq",
     "gh"
   ],
+  "resource_formulae": [
+    "btop",
+    "procs",
+    "smartmontools",
+    "dust",
+    "dua-cli",
+    "dysk",
+    "ncdu",
+    "gdu",
+    "gdu-go",
+    "rclone",
+    "restic",
+    "watchman",
+    "hyperfine",
+    "yq"
+  ],
   "expected_commands": [
     "brew",
     "gh",
@@ -116,6 +186,26 @@
     "cargo",
     "go"
   ],
+  "resource_commands": [
+    "btop",
+    "procs",
+    "smartctl",
+    "dust",
+    "dua",
+    "dysk",
+    "ncdu",
+    "gdu",
+    "rclone",
+    "restic",
+    "watchman",
+    "hyperfine",
+    "yq",
+    "lsof",
+    "iostat",
+    "fs_usage",
+    "iotop",
+    "powermetrics"
+  ],
   "safety_rules": [
     "Do not recursively chmod or chown user data to fix macOS privacy failures.",
     "Do not run TCC resets unless the human explicitly approves them.",
@@ -126,6 +216,11 @@
   ],
   "observability": {
     "blackbox_log": "~/.local/state/ghostty-agent-forge/blackbox.jsonl",
+    "resource_snapshot_log": "/Volumes/wd_black/ghostty-agent-forge/resource-monitor/resource-snapshots-YYYYMMDD.jsonl",
+    "resource_snapshot_fallback": "~/.local/state/ghostty-agent-forge/resources/resource-snapshots-YYYYMMDD.jsonl",
+    "resource_snapshot_interval_secs": 300,
+    "resource_internal_free_warn_gib": 40,
+    "resource_external_free_warn_gib": 250,
     "profile_export": "~/.local/state/ghostty-agent-forge/profile.json",
     "startup_target_ms_warm": 500
   }
