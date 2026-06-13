@@ -1,0 +1,70 @@
+#compdef gaf
+
+local -a commands
+commands=(
+  'doctor:check shell, tools, TCC symptoms, ContextLattice, resources'
+  'ensure:install missing Homebrew formulae from the forge contract'
+  'bench:benchmark interactive zsh startup'
+  'resources:resource toolchain, snapshots, hotspots, and LaunchAgent'
+  'macos:post-update macOS performance restore/status helpers'
+  'memory:ContextLattice memory helper'
+  'blackbox:run a command and append structured execution telemetry'
+  'profile:export this machine terminal capability profile'
+  'tcc:run macOS privacy/FDA path-access doctor'
+  'rules:print the installed agent runtime contract'
+  'forge:run the bootstrap script'
+  'version:print version'
+)
+
+_arguments -C '1:command:->cmds' '*::arg:->args'
+case $state in
+  cmds)
+    _describe -t commands 'gaf command' commands
+    ;;
+  args)
+    case $words[2] in
+      resources)
+        local -a resources_cmds
+        resources_cmds=(
+          'status:show resource-tool status'
+          'snapshot:capture resource snapshot'
+          'tools:list resource tools'
+          'ensure:install resource tools'
+          'hotspots:find disk/resource hotspots'
+          'install-agent:install resource LaunchAgent'
+          'uninstall-agent:remove resource LaunchAgent'
+        )
+        _describe -t commands 'resources command' resources_cmds
+        ;;
+      macos)
+        local -a macos_cmds
+        macos_cmds=(
+          'status:show macOS performance status'
+          'restore:restore macOS performance defaults'
+          'install-agent:install post-update restore agent'
+          'uninstall-agent:remove post-update restore agent'
+        )
+        _describe -t commands 'macos command' macos_cmds
+        ;;
+      memory)
+        local -a memory_cmds
+        memory_cmds=(
+          'health:check ContextLattice health'
+          'preflight:run ContextLattice preflight'
+          'search:search ContextLattice memory'
+          'pack:request ContextLattice context pack'
+          'write:write ContextLattice memory checkpoint'
+        )
+        _describe -t commands 'memory command' memory_cmds
+        ;;
+      profile)
+        local -a profile_cmds
+        profile_cmds=('export:export terminal capability profile')
+        _describe -t commands 'profile command' profile_cmds
+        ;;
+      *)
+        _files
+        ;;
+    esac
+    ;;
+esac

@@ -279,6 +279,7 @@ sudo mdutil -i off /
 - Non-TTY shells must not load terminal widgets that require ZLE.
 - Do not install broad bash completion packages for zsh.
 - Prefer native zsh completions from Homebrew site-functions.
+- Put generated CLI completions under `~/.config/ghostty-agent-forge/zsh/completions/`, not Homebrew-managed directories.
 - Keep runtime managers lazy.
 - Disable automatic Oh My Zsh startup prompts.
 - Do not reset macOS privacy permissions unless the human explicitly approves it.

@@ -2,6 +2,9 @@
 
 typeset -U fpath FPATH
 
+if [[ -d "$HOME/.config/ghostty-agent-forge/zsh/completions" ]]; then
+  fpath=("$HOME/.config/ghostty-agent-forge/zsh/completions" $fpath)
+fi
 if [[ -d /opt/homebrew/share/zsh/site-functions ]]; then
   fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
 fi
@@ -25,4 +28,3 @@ zstyle ':completion:*' matcher-list \
 DISABLE_UNTRACKED_FILES_DIRTY="true"
 DISABLE_AUTO_UPDATE="true"
 zstyle ':omz:update' mode disabled
-

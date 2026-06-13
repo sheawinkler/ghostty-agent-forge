@@ -252,6 +252,10 @@ fi
 for module in completion post-omz contextlattice tools prompt-spaceship late-widgets; do
   write_file "$CONFIG_ROOT/zsh/$module.zsh" "$REPO_ROOT/zsh/$module.zsh"
 done
+for completion in "$REPO_ROOT"/zsh/completions/_*; do
+  [[ -e "$completion" ]] || continue
+  write_file "$CONFIG_ROOT/zsh/completions/${completion:t}" "$completion"
+done
 
 write_file "$CONFIG_ROOT/bin/gaf" "$REPO_ROOT/bin/gaf"
 write_file "$CONFIG_ROOT/agent-runtime.json" "$REPO_ROOT/config/agent-runtime.json"
@@ -314,7 +318,7 @@ tmp_pre="$(mktemp)"
 cat > "$tmp_pre" <<EOF
 # >>> ghostty-agent-forge pre-omz >>>
 typeset -U path PATH fpath FPATH
-path=(/usr/bin /bin /usr/sbin /sbin /usr/local/bin /opt/homebrew/bin \$path)
+path=(\$HOME/.local/bin /opt/homebrew/bin /opt/homebrew/sbin /usr/local/bin /usr/local/sbin /usr/bin /bin /usr/sbin /sbin \$path)
 export PATH
 export ZSH="\${ZSH:-\$HOME/.oh-my-zsh}"
 ZSH_THEME=""
