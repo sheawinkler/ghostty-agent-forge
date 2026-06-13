@@ -1,0 +1,3 @@
+#compdef python3
+
+_python "$@"
