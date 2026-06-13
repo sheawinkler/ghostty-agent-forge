@@ -1,0 +1,15 @@
+#compdef node
+
+_arguments -S \
+  '(- :)--help[print node command-line options]' \
+  '(- :)--version[print node version]' \
+  '--check[syntax check script without executing]' \
+  '--eval+[evaluate JavaScript]:script:' \
+  '--print+[evaluate JavaScript and print result]:script:' \
+  '--require+[preload module]:module:_files' \
+  '--inspect=[activate inspector]:host\:_port:' \
+  '--inspect-brk=[activate inspector and break before user code]:host\:_port:' \
+  '--test[run Node test runner]' \
+  '--watch[restart on file changes]' \
+  '--env-file+[load environment variables from file]:env file:_files' \
+  '*:script or argument:_files -g "*.((m|c|)js|ts|json)(-.)"'
