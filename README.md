@@ -94,7 +94,7 @@ More detail: `docs/install-storage-profiles.md`.
 The bootstrap installs:
 
 ```zsh
-brew install spaceship fzf fzf-tab zsh-autosuggestions zsh-syntax-highlighting zoxide direnv fd ripgrep docker-completion jq gh
+brew install spaceship fzf fzf-tab zsh-autosuggestions zsh-syntax-highlighting zoxide direnv fd ripgrep docker jq gh
 ```
 
 It can optionally install:

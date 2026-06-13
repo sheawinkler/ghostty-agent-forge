@@ -215,7 +215,7 @@ FORMULAE=(
   direnv
   fd
   ripgrep
-  docker-completion
+  docker
   jq
   gh
 )
