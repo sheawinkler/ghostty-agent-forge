@@ -9,6 +9,8 @@ Agents call shells differently than humans. The terminal setup must be safe for 
 - Shell startup must not prompt for updates.
 - Runtime managers should lazy-load.
 - Completion should use zsh-native functions before bash completion bridges.
+- Generated completions such as `op completion zsh` should live in the user completion directory, not the Homebrew prefix.
+- Apple Silicon Homebrew paths should precede Intel Homebrew and system paths.
 - Shell startup should be measurable with `zsh -ic exit`.
 
 ## Verification
@@ -21,4 +23,3 @@ for i in {1..5}; do /usr/bin/time -p zsh -ic exit; done
 ```
 
 Warm startup target: under `500ms`.
-
