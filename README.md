@@ -66,6 +66,8 @@ gaf resources status
 gaf resources tools --missing-only
 gaf macos status
 gaf macos restore --yes
+gaf tcc status
+gaf tcc open full-disk-access
 gaf memory preflight
 gaf behavior status
 gaf behavior install --prime --yes
@@ -317,6 +319,7 @@ sudo mdutil -i off /
 - Disable automatic Oh My Zsh startup prompts.
 - Do not reset macOS privacy permissions unless the human explicitly approves it.
 - Diagnose TCC/FDA failures before changing Unix file permissions.
+- Use `gaf tcc targets` and `gaf tcc open <pane>` to identify and approve the responsible app or binary.
 
 ## Repository Layout
 
