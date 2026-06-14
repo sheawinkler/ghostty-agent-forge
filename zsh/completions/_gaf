@@ -11,7 +11,7 @@ commands=(
   'behavior:private behavior-pack install, render, status, and doctor'
   'blackbox:run a command and append structured execution telemetry'
   'profile:export this machine terminal capability profile'
-  'tcc:run macOS privacy/FDA path-access doctor'
+  'tcc:run macOS privacy/FDA doctor and pane helpers'
   'rules:print the installed agent runtime contract'
   'forge:run the bootstrap script'
   'version:print version'
@@ -68,6 +68,17 @@ case $state in
           'update:update private behavior pack'
         )
         _describe -t commands 'behavior command' behavior_cmds
+        ;;
+      tcc)
+        local -a tcc_cmds
+        tcc_cmds=(
+          'status:probe protected paths and responsible processes'
+          'targets:list apps and binaries that may need privacy grants'
+          'panes:list Privacy & Security pane shortcuts'
+          'open:open a Privacy & Security pane'
+          'guide:explain safe macOS permission setup'
+        )
+        _describe -t commands 'tcc command' tcc_cmds
         ;;
       profile)
         local -a profile_cmds

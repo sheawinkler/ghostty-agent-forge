@@ -39,7 +39,10 @@
     "memory_write": "gaf memory write <file> <content> [project] [topic_path]",
     "runtime_contract": "gaf rules",
     "profile_export": "gaf profile export",
-    "tcc_doctor": "gaf tcc"
+    "tcc_doctor": "gaf tcc status",
+    "tcc_targets": "gaf tcc targets",
+    "tcc_panes": "gaf tcc panes",
+    "tcc_guide": "gaf tcc guide"
   },
   "installation_profiles": {
     "internal-ssd": {
