@@ -26,6 +26,7 @@ grep -q "Ghostty Agent Forge macOS TCC doctor" /tmp/ghostty-agent-forge-tcc-stat
 grep -q "Permission targets" /tmp/ghostty-agent-forge-tcc-targets.out
 "$ROOT/bin/gaf" tcc panes >/tmp/ghostty-agent-forge-tcc-panes.out
 grep -q "full-disk-access" /tmp/ghostty-agent-forge-tcc-panes.out
+! grep -Eq "microphone|camera" /tmp/ghostty-agent-forge-tcc-panes.out
 "$ROOT/bin/gaf" tcc guide >/tmp/ghostty-agent-forge-tcc-guide.out
 grep -q "macOS privacy grants are not normal Unix permissions" /tmp/ghostty-agent-forge-tcc-guide.out
 "$ROOT/bin/gaf" resources install-agent --dry-run >/tmp/ghostty-agent-forge-resource-agent.out

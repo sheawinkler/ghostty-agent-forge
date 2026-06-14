@@ -157,7 +157,7 @@ TCC subcommands:
   tcc status
   tcc targets
   tcc panes
-  tcc open <full-disk-access|files-and-folders|accessibility|automation|developer-tools|microphone|camera>
+  tcc open <full-disk-access|files-and-folders|accessibility|automation|developer-tools>
   tcc guide
 EOF
 }
