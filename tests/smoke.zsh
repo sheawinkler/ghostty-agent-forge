@@ -16,6 +16,10 @@ grep -q "btop" /tmp/ghostty-agent-forge-resource-tools.out
 python3 -m json.tool /tmp/ghostty-agent-forge-resource-snapshot.json >/dev/null
 "$ROOT/bin/gaf" resources status >/tmp/ghostty-agent-forge-resource-status.out
 grep -q "Ghostty Agent Forge resource status" /tmp/ghostty-agent-forge-resource-status.out
+"$ROOT/bin/gaf" behavior status >/tmp/ghostty-agent-forge-behavior-status.out
+grep -q "Agent behavior packs" /tmp/ghostty-agent-forge-behavior-status.out
+"$ROOT/bin/gaf" behavior doctor >/tmp/ghostty-agent-forge-behavior-doctor.out
+grep -q "Behavior render dry run" /tmp/ghostty-agent-forge-behavior-doctor.out
 "$ROOT/bin/gaf" resources install-agent --dry-run >/tmp/ghostty-agent-forge-resource-agent.out
 grep -q "resources snapshot --append" /tmp/ghostty-agent-forge-resource-agent.out
 "$ROOT/bin/gaf" macos status >/tmp/ghostty-agent-forge-macos-status.out
@@ -34,6 +38,8 @@ rm -f /tmp/ghostty-agent-forge-doctor.out
 rm -f /tmp/ghostty-agent-forge-resource-tools.out
 rm -f /tmp/ghostty-agent-forge-resource-snapshot.json
 rm -f /tmp/ghostty-agent-forge-resource-status.out
+rm -f /tmp/ghostty-agent-forge-behavior-status.out
+rm -f /tmp/ghostty-agent-forge-behavior-doctor.out
 rm -f /tmp/ghostty-agent-forge-resource-agent.out
 rm -f /tmp/ghostty-agent-forge-macos-status.out
 rm -f /tmp/ghostty-agent-forge-macos-restore.out
