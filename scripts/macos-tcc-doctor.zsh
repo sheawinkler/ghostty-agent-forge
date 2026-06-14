@@ -7,8 +7,6 @@ SERVICE_URLS=(
   "accessibility:x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
   "automation:x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
   "developer-tools:x-apple.systempreferences:com.apple.preference.security?Privacy_DeveloperTools"
-  "microphone:x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
-  "camera:x-apple.systempreferences:com.apple.preference.security?Privacy_Camera"
 )
 
 usage() {
@@ -24,7 +22,7 @@ Subcommands:
 
 Pane names:
   full-disk-access, files-and-folders, accessibility, automation,
-  developer-tools, microphone, camera
+  developer-tools
 USAGE
 }
 
@@ -74,6 +72,25 @@ PY
   fi
 }
 
+python_identity() {
+  if ! have_cmd python3; then
+    print_check "missing" "python3" "not found"
+    return 0
+  fi
+  local bin_path real_path version executable
+  bin_path="$(command -v python3)"
+  real_path="$(realpath "$bin_path" 2>/dev/null || print -r -- "$bin_path")"
+  version="$(python3 -V 2>&1 || true)"
+  executable="$(python3 - <<'PY' 2>/dev/null || true
+import sys
+print(sys.executable)
+PY
+)"
+  print_check "ok" "python3" "$bin_path | $version"
+  print_check "ok" "python3.real" "$real_path"
+  [[ -n "$executable" ]] && print_check "ok" "python3.exec" "$executable"
+}
+
 app_target() {
   local label="$1" app_path="$2" services="$3"
   if [[ -e "$app_path" ]]; then
@@ -120,6 +137,10 @@ status() {
   echo "Responsible process hints"
   print_check "info" "parent" "${PPID:-unknown}"
   ps -p "${PPID:-0}" -o pid=,ppid=,comm= 2>/dev/null | sed 's/^/process  parent_process              /' || true
+  echo
+  echo "Python identity"
+  python_identity
+  echo
   targets
 }
 
@@ -135,7 +156,6 @@ targets() {
   app_target "Windsurf" "/Applications/Windsurf.app" "Full Disk Access if it launches terminals/agents"
   app_target "Terminal" "/System/Applications/Utilities/Terminal.app" "Full Disk Access if used as an agent launcher"
   app_target "iTerm" "/Applications/iTerm.app" "Full Disk Access if used as an agent launcher"
-  app_target "Granola" "/Applications/Granola.app" "Microphone; Accessibility only if prompted"
   echo
   echo "CLI binaries to add only if macOS names that binary in the prompt"
   binary_target "python3" "Full Disk Access or Files & Folders if prompt says Python/Python3"
@@ -180,12 +200,13 @@ What GAF should not do on a normal machine:
 - run broad `tccutil reset` without explicit human approval;
 - recursively chmod/chown protected folders as a privacy workaround;
 - assume every CLI binary needs Full Disk Access.
+- request camera or microphone permissions for GAF; those are app-specific media grants.
 
 Best practice:
 1. Grant Full Disk Access to the app that launches agents: usually Ghostty and Codex.app.
 2. Add CLI binaries only if the macOS prompt names the binary directly, such as Python.
 3. For UI automation, grant Accessibility to the controlling app, not every CLI tool.
-4. For microphone/camera, grant only the app that records, such as Granola.
+4. Do not grant microphone/camera to GAF. Grant media permissions only to the app that records.
 5. Restart the affected app after granting access.
 GUIDE
 }

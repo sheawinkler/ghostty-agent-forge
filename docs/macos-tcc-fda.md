@@ -13,11 +13,14 @@ High-signal symptoms:
 
 ## Hard Boundary
 
-GAF cannot safely and silently grant Full Disk Access, Accessibility, microphone,
-camera, or Automation permissions on an unmanaged Mac. macOS requires the user to
-approve those grants in Privacy & Security, unless the machine is managed by MDM
-with a PPPC profile. Direct TCC database edits are unsupported and should not be
-part of normal setup.
+GAF cannot safely and silently grant Full Disk Access, Files & Folders,
+Accessibility, Automation, or Developer Tools permissions on an unmanaged Mac.
+macOS requires the user to approve those grants in Privacy & Security, unless the
+machine is managed by MDM with a PPPC profile. Direct TCC database edits are
+unsupported and should not be part of normal setup.
+
+GAF does not need camera or microphone access. Grant media permissions only to
+the app that records or captures media.
 
 ## Diagnose Before Changing Permissions
 
@@ -34,7 +37,6 @@ gaf tcc targets
 gaf tcc panes
 gaf tcc open full-disk-access
 gaf tcc open accessibility
-gaf tcc open microphone
 gaf tcc guide
 ```
 
@@ -54,6 +56,7 @@ the prompt. Homebrew-managed binary paths can change after upgrades, so app-leve
 launcher grants are more stable.
 
 For UI automation, grant Accessibility to the controlling app. For microphone or
-camera, grant only the app that records or captures media.
+camera, do not grant anything to GAF; grant only the app that records or captures
+media.
 
 Do not use recursive `chmod` or `chown` as a first response to a TCC denial.
