@@ -98,6 +98,12 @@ RESOURCE_COMMANDS=(
 RESOURCE_LAUNCH_AGENT_ID="com.contextlattice.ghostty-agent-forge.resources"
 RESOURCE_INTERVAL_SECS="${GAF_RESOURCE_INTERVAL_SECS:-300}"
 RESOURCE_LOG_DIR="${GAF_RESOURCE_LOG_DIR:-/Volumes/wd_black/ghostty-agent-forge/resource-monitor}"
+GAF_BEHAVIOR_HOME="${GAF_BEHAVIOR_HOME:-$HOME/.contextlattice/agent-packs}"
+GAF_BEHAVIOR_LINK="${GAF_BEHAVIOR_LINK:-$GAF_HOME/behavior}"
+GAF_PRIME_REPO="${GAF_PRIME_REPO:-sheawinkler/contextlattice-agent-prime}"
+GAF_PRIME_REF="${GAF_PRIME_REF:-main}"
+GAF_PRIME_RELEASE="${GAF_PRIME_RELEASE:-latest}"
+GAF_PRIME_ALLOWED_LOGIN="${GAF_PRIME_ALLOWED_LOGIN:-sheawinkler}"
 
 usage() {
   cat <<'EOF'
@@ -110,6 +116,7 @@ Commands:
   resources <subcommand> Resource toolchain, snapshots, hotspots, and LaunchAgent.
   macos <subcommand>     Post-update macOS performance restore/status helpers.
   memory <subcommand>    ContextLattice memory helper.
+  behavior <subcommand>  Private behavior-pack install, render, status, and doctor.
   blackbox -- <cmd...>   Run a command and append structured execution telemetry.
   profile export [path]  Export this machine's terminal capability profile.
   tcc                    Run macOS privacy/FDA path-access doctor.
@@ -138,6 +145,13 @@ macOS subcommands:
   macos restore [--yes] [--system]
   macos install-agent [--yes] [--load]
   macos uninstall-agent [--yes]
+
+Behavior subcommands:
+  behavior status
+  behavior doctor
+  behavior install --prime [--source path|--bundle tar.gz] [--repo owner/repo] [--release tag|latest] [--yes] [--dry-run]
+  behavior render --all [--dry-run]
+  behavior update [--yes]
 EOF
 }
 
@@ -734,6 +748,296 @@ resources() {
   esac
 }
 
+behavior_current_pack() {
+  if [[ -e "$GAF_BEHAVIOR_LINK" ]]; then
+    print -r -- "${GAF_BEHAVIOR_LINK:A}"
+    return 0
+  fi
+  if [[ -e "$GAF_BEHAVIOR_HOME/prime/current" ]]; then
+    print -r -- "${GAF_BEHAVIOR_HOME/prime/current:A}"
+    return 0
+  fi
+  return 1
+}
+
+behavior_pack_version() {
+  local pack_dir="$1"
+  python3 - "$pack_dir/agent-prime-pack.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+with path.open("r", encoding="utf-8") as fh:
+    payload = json.load(fh)
+print(payload["version"])
+PY
+}
+
+behavior_require_login() {
+  if [[ "${GAF_BEHAVIOR_SKIP_LOGIN_CHECK:-0}" == "1" ]]; then
+    return 0
+  fi
+  have_cmd gh || { print -u2 -- "gh is required for private behavior-pack install"; return 1; }
+  local login
+  login="$(gh api user -q .login 2>/dev/null || true)"
+  if [[ "$login" != "$GAF_PRIME_ALLOWED_LOGIN" ]]; then
+    print -u2 -- "behavior pack install requires GitHub login '$GAF_PRIME_ALLOWED_LOGIN' (current: ${login:-unknown})"
+    return 1
+  fi
+}
+
+behavior_safe_link() {
+  local target="$1"
+  local link="$2"
+  mkdir -p "${link:h}"
+  if [[ -e "$link" && ! -L "$link" ]]; then
+    print -u2 -- "refusing to replace non-symlink path: $link"
+    return 1
+  fi
+  rm -f "$link"
+  ln -s "$target" "$link"
+}
+
+behavior_status() {
+  print "Agent behavior packs"
+  print
+  print_check "info" "behavior_home" "$GAF_BEHAVIOR_HOME"
+  print_check "info" "behavior_link" "$GAF_BEHAVIOR_LINK"
+
+  local pack_dir=""
+  if pack_dir="$(behavior_current_pack 2>/dev/null)"; then
+    print_check "ok" "prime_pack" "$pack_dir"
+    if [[ -f "$pack_dir/agent-prime-pack.json" ]]; then
+      local version
+      version="$(behavior_pack_version "$pack_dir" 2>/dev/null || true)"
+      print_check "ok" "prime_version" "${version:-unknown}"
+    else
+      print_check "fail" "prime_manifest" "missing agent-prime-pack.json"
+    fi
+  else
+    print_check "missing" "prime_pack" "not installed"
+  fi
+
+  print
+  print "Harness managed blocks"
+  local marker="contextlattice-agent-prime"
+  local target
+  for target in "$HOME/.codex/AGENTS.md" "$HOME/.claude/CLAUDE.md" "$HOME/.gemini/GEMINI.md" "$HOME/.config/opencode/AGENTS.md"; do
+    if [[ -f "$target" ]] && grep -q "$marker" "$target"; then
+      print_check "ok" "${target#$HOME/}" "managed block present"
+    elif [[ -f "$target" ]]; then
+      print_check "missing" "${target#$HOME/}" "managed block absent"
+    else
+      print_check "missing" "${target#$HOME/}" "file absent"
+    fi
+  done
+
+  print
+  print "ContextLattice behavior support"
+  local cmd
+  for cmd in contextlattice_agent_start contextlattice_agent_policy_pack contextlattice_agent_adapter contextlattice_checkpoint; do
+    if have_cmd "$cmd"; then
+      print_check "ok" "$cmd" "$(command -v "$cmd")"
+    else
+      print_check "missing" "$cmd" ""
+    fi
+  done
+
+  if have_cmd gh; then
+    local login
+    login="$(gh api user -q .login 2>/dev/null || true)"
+    [[ "$login" == "$GAF_PRIME_ALLOWED_LOGIN" ]] \
+      && print_check "ok" "github_login" "$login" \
+      || print_check "warn" "github_login" "${login:-unknown}"
+  else
+    print_check "missing" "gh" "required for private pack updates"
+  fi
+}
+
+behavior_render() {
+  local dry_run=0 install=1
+  while (( $# > 0 )); do
+    case "$1" in
+      --all) install=1 ;;
+      --dry-run) dry_run=1 ;;
+      *) print -u2 -- "unknown behavior render arg: $1"; return 2 ;;
+    esac
+    shift
+  done
+  local pack_dir
+  pack_dir="$(behavior_current_pack)" || { print -u2 -- "prime behavior pack is not installed"; return 1; }
+  local renderer="$pack_dir/scripts/render-agent-prime.py"
+  [[ -x "$renderer" ]] || { print -u2 -- "renderer not executable: $renderer"; return 1; }
+  local args=(--pack-root "$pack_dir" --home "$HOME" --gaf-home "$GAF_HOME" --pretty)
+  (( install )) && args+=(--install)
+  (( dry_run )) && args+=(--dry-run)
+  python3 "$renderer" "${args[@]}"
+}
+
+behavior_install() {
+  local prime=0 yes=0 dry_run=0 no_render=0 source_dir="" bundle="" repo="$GAF_PRIME_REPO" ref="$GAF_PRIME_REF" release="$GAF_PRIME_RELEASE"
+  while (( $# > 0 )); do
+    case "$1" in
+      --prime) prime=1 ;;
+      --yes|-y) yes=1 ;;
+      --dry-run) dry_run=1 ;;
+      --no-render) no_render=1 ;;
+      --source)
+        shift
+        source_dir="${1:-}"
+        [[ -n "$source_dir" ]] || { print -u2 -- "missing path for --source"; return 2; }
+        ;;
+      --bundle)
+        shift
+        bundle="${1:-}"
+        [[ -n "$bundle" ]] || { print -u2 -- "missing path for --bundle"; return 2; }
+        ;;
+      --repo)
+        shift
+        repo="${1:-}"
+        [[ -n "$repo" ]] || { print -u2 -- "missing owner/repo for --repo"; return 2; }
+        ;;
+      --ref)
+        shift
+        ref="${1:-}"
+        [[ -n "$ref" ]] || { print -u2 -- "missing ref for --ref"; return 2; }
+        ;;
+      --release)
+        shift
+        release="${1:-}"
+        [[ -n "$release" ]] || { print -u2 -- "missing tag/latest for --release"; return 2; }
+        ;;
+      *) print -u2 -- "unknown behavior install arg: $1"; return 2 ;;
+    esac
+    shift
+  done
+  (( prime )) || { print -u2 -- "usage: gaf behavior install --prime ..."; return 2; }
+  if (( ! yes && ! dry_run )); then
+    print -r -- "This installs a private behavior pack and writes managed harness blocks."
+    print -r -- "Re-run with --yes to apply."
+    return 2
+  fi
+  behavior_require_login
+
+  local tmp_dir="" cleanup_source=0
+  if [[ -n "$source_dir" ]]; then
+    source_dir="${source_dir:A}"
+  elif [[ -n "$bundle" ]]; then
+    [[ -f "$bundle" ]] || { print -u2 -- "bundle not found: $bundle"; return 1; }
+    local bundle_dir="${bundle:A:h}"
+    if [[ -f "$bundle_dir/SHA256SUMS" ]]; then
+      (cd "$bundle_dir" && shasum -a 256 -c SHA256SUMS)
+    else
+      warn "SHA256SUMS not found next to bundle; installing explicit local bundle without checksum verification"
+    fi
+    tmp_dir="$(mktemp -d)"
+    mkdir -p "$tmp_dir/src"
+    tar -xzf "$bundle" -C "$tmp_dir/src"
+    local children=("$tmp_dir"/src/*(N))
+    (( ${#children[@]} == 1 )) || { print -u2 -- "bundle must contain one root directory"; return 1; }
+    source_dir="${children[1]:A}"
+    cleanup_source=1
+  else
+    if (( dry_run )); then
+      print -r -- "would download release $release from $repo"
+      print -r -- "would verify SHA256SUMS"
+      print -r -- "would install into $GAF_BEHAVIOR_HOME/prime/<version>"
+      return 0
+    fi
+    have_cmd gh || { print -u2 -- "gh is required to download $repo"; return 1; }
+    tmp_dir="$(mktemp -d)"
+    mkdir -p "$tmp_dir/release" "$tmp_dir/src"
+    if [[ "$release" == "latest" ]]; then
+      gh release download --repo "$repo" --pattern 'contextlattice-agent-prime-*.tar.gz' --pattern 'SHA256SUMS' --dir "$tmp_dir/release"
+    else
+      gh release download "$release" --repo "$repo" --pattern 'contextlattice-agent-prime-*.tar.gz' --pattern 'SHA256SUMS' --dir "$tmp_dir/release"
+    fi
+    (cd "$tmp_dir/release" && shasum -a 256 -c SHA256SUMS)
+    local archives=("$tmp_dir"/release/contextlattice-agent-prime-*.tar.gz(N))
+    (( ${#archives[@]} == 1 )) || { print -u2 -- "expected one release tarball, found ${#archives[@]}"; return 1; }
+    tar -xzf "$archives[1]" -C "$tmp_dir/src"
+    local children=("$tmp_dir"/src/*(N))
+    if (( ${#children[@]} == 1 )) && [[ -d "${children[1]}" && ! -f "$tmp_dir/src/agent-prime-pack.json" ]]; then
+      source_dir="${children[1]:A}"
+    else
+      source_dir="${tmp_dir:A}/src"
+    fi
+    cleanup_source=1
+  fi
+  [[ -f "$source_dir/agent-prime-pack.json" ]] || { print -u2 -- "not an agent-prime pack: $source_dir"; return 1; }
+  [[ -x "$source_dir/scripts/render-agent-prime.py" ]] || { print -u2 -- "renderer missing or not executable: $source_dir/scripts/render-agent-prime.py"; return 1; }
+
+  local version target tmp_target
+  version="$(behavior_pack_version "$source_dir")"
+  target="$GAF_BEHAVIOR_HOME/prime/$version"
+  tmp_target="$GAF_BEHAVIOR_HOME/prime/.tmp-$version-$$"
+
+  if (( dry_run )); then
+    print -r -- "would install $source_dir -> $target"
+    print -r -- "would link $GAF_BEHAVIOR_HOME/prime/current -> $target"
+    print -r -- "would link $GAF_BEHAVIOR_LINK -> $GAF_BEHAVIOR_HOME/prime/current"
+    (( cleanup_source )) && rm -rf "$tmp_dir"
+    return 0
+  fi
+
+  mkdir -p "$GAF_BEHAVIOR_HOME/prime"
+  rm -rf "$tmp_target"
+  rsync -a --delete --exclude .git --exclude dist "$source_dir/" "$tmp_target/"
+  rm -rf "$target"
+  mv "$tmp_target" "$target"
+  behavior_safe_link "$target" "$GAF_BEHAVIOR_HOME/prime/current"
+  behavior_safe_link "$GAF_BEHAVIOR_HOME/prime/current" "$GAF_BEHAVIOR_LINK"
+  (( cleanup_source )) && rm -rf "$tmp_dir"
+  log "installed behavior pack $version at $target"
+  if (( ! no_render )); then
+    behavior_render --all
+  fi
+}
+
+behavior_doctor() {
+  behavior_status
+  print
+  print "Behavior render dry run"
+  local pack_dir
+  if pack_dir="$(behavior_current_pack 2>/dev/null)"; then
+    if behavior_render --all --dry-run >/tmp/gaf-behavior-render.json; then
+      print_check "ok" "render_dry_run" "/tmp/gaf-behavior-render.json"
+    else
+      print_check "fail" "render_dry_run" "renderer failed"
+      return 1
+    fi
+  else
+    print_check "missing" "render_dry_run" "prime pack not installed"
+  fi
+}
+
+behavior_update() {
+  local yes=0
+  while (( $# > 0 )); do
+    case "$1" in
+      --yes|-y) yes=1 ;;
+      *) print -u2 -- "unknown behavior update arg: $1"; return 2 ;;
+    esac
+    shift
+  done
+  (( yes )) || { print -r -- "Re-run with --yes to update the private behavior pack."; return 2; }
+  behavior_install --prime --yes
+}
+
+behavior() {
+  local sub="${1:-}"
+  shift || true
+  case "$sub" in
+    status) behavior_status "$@" ;;
+    doctor) behavior_doctor "$@" ;;
+    install) behavior_install "$@" ;;
+    render) behavior_render "$@" ;;
+    update) behavior_update "$@" ;;
+    *) usage; return 2 ;;
+  esac
+}
+
 bench() {
   local runs="${1:-5}"
   [[ "$runs" == <-> ]] || { print -u2 -- "runs must be integer"; return 2; }
@@ -972,6 +1276,7 @@ case "${1:-}" in
   resources) shift; resources "$@" ;;
   macos) shift; macos "$@" ;;
   memory) shift; memory "$@" ;;
+  behavior) shift; behavior "$@" ;;
   blackbox) shift; blackbox "$@" ;;
   profile)
     shift

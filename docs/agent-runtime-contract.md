@@ -27,11 +27,21 @@ Agents should run:
 ```zsh
 gaf doctor
 gaf memory preflight
+gaf behavior status
 ```
 
 If ContextLattice is unavailable, continue from local evidence and report degraded-memory mode.
 
 If `gaf doctor` reports blocked Documents or external-volume access, diagnose macOS Privacy & Security before changing Unix mode bits.
+
+Private behavior packs are optional and intentionally not vendored into this
+public repo. When installed, agents should use:
+
+```zsh
+gaf behavior doctor
+```
+
+to verify managed harness blocks and ContextLattice behavior-pack support.
 
 ## Shell Modes
 

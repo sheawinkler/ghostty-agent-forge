@@ -8,6 +8,7 @@ commands=(
   'resources:resource toolchain, snapshots, hotspots, and LaunchAgent'
   'macos:post-update macOS performance restore/status helpers'
   'memory:ContextLattice memory helper'
+  'behavior:private behavior-pack install, render, status, and doctor'
   'blackbox:run a command and append structured execution telemetry'
   'profile:export this machine terminal capability profile'
   'tcc:run macOS privacy/FDA path-access doctor'
@@ -56,6 +57,17 @@ case $state in
           'write:write ContextLattice memory checkpoint'
         )
         _describe -t commands 'memory command' memory_cmds
+        ;;
+      behavior)
+        local -a behavior_cmds
+        behavior_cmds=(
+          'status:inspect installed behavior pack'
+          'doctor:verify behavior pack render support'
+          'install:install private behavior pack'
+          'render:render managed harness blocks'
+          'update:update private behavior pack'
+        )
+        _describe -t commands 'behavior command' behavior_cmds
         ;;
       profile)
         local -a profile_cmds

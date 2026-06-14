@@ -67,6 +67,9 @@ gaf resources tools --missing-only
 gaf macos status
 gaf macos restore --yes
 gaf memory preflight
+gaf behavior status
+gaf behavior install --prime --yes
+gaf behavior doctor
 gaf bench 5
 gaf rules
 ```
@@ -150,6 +153,34 @@ The `contextlattice.zsh` module adds:
 
 These helpers are intentionally lightweight. They should not start services, reset permissions, or mutate memory unless explicitly invoked.
 
+## Agent Behavior Packs
+
+Ghostty Agent Forge can install private behavior packs that render compact,
+managed rule blocks into multiple harnesses while keeping proprietary policy out
+of this public repository.
+
+The Sheawinkler private pack is expected at:
+
+```text
+sheawinkler/contextlattice-agent-prime
+```
+
+Install requires the authenticated GitHub login to be `sheawinkler`:
+
+```zsh
+gaf behavior install --prime --yes
+gaf behavior status
+gaf behavior doctor
+```
+
+For local pack development:
+
+```zsh
+gaf behavior install --prime --source ~/Documents/Projects/contextlattice-agent-prime --yes
+```
+
+More detail: `docs/agent-behavior-packs.md`.
+
 ## Agent Control Plane
 
 Ghostty Agent Forge ships a small local CLI:
@@ -164,6 +195,8 @@ gaf resources install-agent --load
 gaf bench 5                # zsh startup benchmark
 gaf macos status           # post-update macOS performance drift audit
 gaf macos restore --yes    # reapply safe user-level post-update settings
+gaf behavior status        # inspect installed private behavior pack
+gaf behavior doctor        # verify private pack render and harness blocks
 gaf blackbox -- <command>  # run command with local JSONL telemetry
 gaf profile export         # export machine capability profile
 gaf rules                  # print the agent runtime contract
@@ -307,6 +340,7 @@ ghostty-agent-forge/
     late-widgets.zsh
   docs/
     agent-shell-rules.md
+    agent-behavior-packs.md
     agent-runtime-contract.md
     contextlattice-integration.md
     flight-recorder.md
