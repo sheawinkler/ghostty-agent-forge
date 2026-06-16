@@ -9,6 +9,7 @@ commands=(
   'macos:post-update macOS performance restore/status helpers'
   'memory:ContextLattice memory helper'
   'behavior:private behavior-pack install, render, status, and doctor'
+  'claude:Claude Code permission hook install, status, and doctor'
   'blackbox:run a command and append structured execution telemetry'
   'profile:export this machine terminal capability profile'
   'tcc:run macOS privacy/FDA doctor and pane helpers'
@@ -68,6 +69,13 @@ case $state in
           'update:update private behavior pack'
         )
         _describe -t commands 'behavior command' behavior_cmds
+        ;;
+      claude)
+        local -a claude_cmds
+        claude_cmds=(
+          'permissions:Claude Code Bash approval hook status/install/doctor'
+        )
+        _describe -t commands 'claude command' claude_cmds
         ;;
       tcc)
         local -a tcc_cmds
