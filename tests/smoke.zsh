@@ -20,6 +20,35 @@ grep -q "Ghostty Agent Forge resource status" /tmp/ghostty-agent-forge-resource-
 grep -q "Agent behavior packs" /tmp/ghostty-agent-forge-behavior-status.out
 "$ROOT/bin/gaf" behavior doctor >/tmp/ghostty-agent-forge-behavior-doctor.out
 grep -q "Behavior render dry run" /tmp/ghostty-agent-forge-behavior-doctor.out
+rm -rf /tmp/ghostty-agent-forge-claude
+mkdir -p /tmp/ghostty-agent-forge-claude
+cat > /tmp/ghostty-agent-forge-claude/settings.json <<'JSON'
+{
+  "permissions": {
+    "allow": ["Read"],
+    "ask": ["Bash(grep:*)", "WebFetch"],
+    "deny": ["Bash(rm:*)", "Write"]
+  },
+  "hooks": {
+    "PreToolUse": [{"matcher": "Read", "hooks": []}, {"matcher": "Bash", "hooks": []}],
+    "PermissionRequest": [{"matcher": "Bash", "hooks": []}]
+  }
+}
+JSON
+"$ROOT/bin/gaf" claude permissions install --yes --claude-dir /tmp/ghostty-agent-forge-claude >/tmp/ghostty-agent-forge-claude-install.out
+grep -q "Installed Claude Code Bash approval hook" /tmp/ghostty-agent-forge-claude-install.out
+"$ROOT/bin/gaf" claude permissions status --claude-dir /tmp/ghostty-agent-forge-claude >/tmp/ghostty-agent-forge-claude-status.out
+grep -q "Claude Code permissions status" /tmp/ghostty-agent-forge-claude-status.out
+"$ROOT/bin/gaf" claude permissions doctor --claude-dir /tmp/ghostty-agent-forge-claude >/tmp/ghostty-agent-forge-claude-doctor.out
+grep -q "pretool_nested_sudo" /tmp/ghostty-agent-forge-claude-doctor.out
+jq -e '
+  (.permissions.defaultMode == "acceptEdits")
+  and ((.permissions.allow // []) | index("Bash"))
+  and (((.permissions.ask // []) | map(select(type == "string" and (. == "Bash" or startswith("Bash(")))) | length) == 0)
+  and (((.permissions.deny // []) | map(select(type == "string" and (. == "Bash" or startswith("Bash(")))) | length) == 0)
+  and (((.hooks.PreToolUse // []) | map(select(.matcher == "Bash")) | length) == 1)
+  and (((.hooks.PermissionRequest // []) | map(select(.matcher == "Bash")) | length) == 1)
+' /tmp/ghostty-agent-forge-claude/settings.json >/dev/null
 "$ROOT/bin/gaf" tcc status >/tmp/ghostty-agent-forge-tcc-status.out
 grep -q "Ghostty Agent Forge macOS TCC doctor" /tmp/ghostty-agent-forge-tcc-status.out
 "$ROOT/bin/gaf" tcc targets >/tmp/ghostty-agent-forge-tcc-targets.out
@@ -49,6 +78,10 @@ rm -f /tmp/ghostty-agent-forge-resource-snapshot.json
 rm -f /tmp/ghostty-agent-forge-resource-status.out
 rm -f /tmp/ghostty-agent-forge-behavior-status.out
 rm -f /tmp/ghostty-agent-forge-behavior-doctor.out
+rm -f /tmp/ghostty-agent-forge-claude-install.out
+rm -f /tmp/ghostty-agent-forge-claude-status.out
+rm -f /tmp/ghostty-agent-forge-claude-doctor.out
+rm -rf /tmp/ghostty-agent-forge-claude
 rm -f /tmp/ghostty-agent-forge-tcc-status.out
 rm -f /tmp/ghostty-agent-forge-tcc-targets.out
 rm -f /tmp/ghostty-agent-forge-tcc-panes.out

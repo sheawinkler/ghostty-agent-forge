@@ -35,6 +35,9 @@
     "behavior_install_prime": "gaf behavior install --prime --yes",
     "behavior_render": "gaf behavior render --all",
     "behavior_doctor": "gaf behavior doctor",
+    "claude_permissions_status": "gaf claude permissions status",
+    "claude_permissions_install": "gaf claude permissions install --yes",
+    "claude_permissions_doctor": "gaf claude permissions doctor",
     "memory_search": "gaf memory search <query> [project] [topic_path]",
     "memory_write": "gaf memory write <file> <content> [project] [topic_path]",
     "runtime_contract": "gaf rules",
@@ -221,6 +224,7 @@
     "Do not load ZLE widgets in non-interactive shells.",
     "Do not start ContextLattice services implicitly from shell startup.",
     "Do not hide degraded memory, missing tools, failing startup, or permission blocks.",
+    "Claude Bash approval hooks may auto-allow non-sudo shell work but must keep executable sudo behind approval.",
     "Use direct command evidence before claiming a tool, repo, or permission state is fixed."
   ],
   "observability": {

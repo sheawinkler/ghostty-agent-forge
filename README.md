@@ -72,6 +72,8 @@ gaf memory preflight
 gaf behavior status
 gaf behavior install --prime --yes
 gaf behavior doctor
+gaf claude permissions status
+gaf claude permissions install --dry-run
 gaf bench 5
 gaf rules
 ```
@@ -183,6 +185,23 @@ gaf behavior install --prime --source ~/Documents/Projects/contextlattice-agent-
 
 More detail: `docs/agent-behavior-packs.md`.
 
+## Claude Code Permissions
+
+GAF can install a Claude Code Bash approval hook for agent-heavy local work:
+
+```zsh
+gaf claude permissions install --dry-run
+gaf claude permissions install --yes
+gaf claude permissions doctor
+```
+
+The hook auto-allows non-sudo Bash/zsh/git/python/python3 commands and leaves
+executable `sudo` behind Claude Code's normal approval prompt. It preserves
+unrelated settings and replaces only exact `Bash` hook groups in `PreToolUse`
+and `PermissionRequest`.
+
+More detail: `docs/claude-permissions.md`.
+
 ## Agent Control Plane
 
 Ghostty Agent Forge ships a small local CLI:
@@ -199,6 +218,9 @@ gaf macos status           # post-update macOS performance drift audit
 gaf macos restore --yes    # reapply safe user-level post-update settings
 gaf behavior status        # inspect installed private behavior pack
 gaf behavior doctor        # verify private pack render and harness blocks
+gaf claude permissions status
+gaf claude permissions install --yes
+gaf claude permissions doctor
 gaf blackbox -- <command>  # run command with local JSONL telemetry
 gaf profile export         # export machine capability profile
 gaf rules                  # print the agent runtime contract
@@ -328,6 +350,7 @@ ghostty-agent-forge/
   README.md
   scripts/
     bootstrap-ghostty-agent-forge.zsh
+    claude-permissions.zsh
     contextlattice-preflight.zsh
     macos-tcc-doctor.zsh
   bin/
@@ -345,6 +368,7 @@ ghostty-agent-forge/
     agent-shell-rules.md
     agent-behavior-packs.md
     agent-runtime-contract.md
+    claude-permissions.md
     contextlattice-integration.md
     flight-recorder.md
     install-storage-profiles.md

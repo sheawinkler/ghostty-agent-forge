@@ -259,10 +259,10 @@ done
 
 write_file "$CONFIG_ROOT/bin/gaf" "$REPO_ROOT/bin/gaf"
 write_file "$CONFIG_ROOT/agent-runtime.json" "$REPO_ROOT/config/agent-runtime.json"
-for helper in bootstrap-ghostty-agent-forge contextlattice-preflight macos-tcc-doctor macos-performance-restore; do
+for helper in bootstrap-ghostty-agent-forge contextlattice-preflight macos-tcc-doctor macos-performance-restore claude-permissions; do
   write_file "$CONFIG_ROOT/scripts/$helper.zsh" "$REPO_ROOT/scripts/$helper.zsh"
 done
-run chmod +x "$CONFIG_ROOT/bin/gaf" "$CONFIG_ROOT/scripts/bootstrap-ghostty-agent-forge.zsh" "$CONFIG_ROOT/scripts/contextlattice-preflight.zsh" "$CONFIG_ROOT/scripts/macos-tcc-doctor.zsh" "$CONFIG_ROOT/scripts/macos-performance-restore.zsh"
+run chmod +x "$CONFIG_ROOT/bin/gaf" "$CONFIG_ROOT/scripts/bootstrap-ghostty-agent-forge.zsh" "$CONFIG_ROOT/scripts/contextlattice-preflight.zsh" "$CONFIG_ROOT/scripts/macos-tcc-doctor.zsh" "$CONFIG_ROOT/scripts/macos-performance-restore.zsh" "$CONFIG_ROOT/scripts/claude-permissions.zsh"
 run ln -sf "$CONFIG_ROOT/bin/gaf" "$HOME/.local/bin/gaf"
 
 touch "$HOME/.zprofile" "$HOME/.zshrc"

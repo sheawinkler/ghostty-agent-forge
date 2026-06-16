@@ -117,6 +117,7 @@ Commands:
   macos <subcommand>     Post-update macOS performance restore/status helpers.
   memory <subcommand>    ContextLattice memory helper.
   behavior <subcommand>  Private behavior-pack install, render, status, and doctor.
+  claude <subcommand>    Claude Code permission hook install, status, and doctor.
   blackbox -- <cmd...>   Run a command and append structured execution telemetry.
   profile export [path]  Export this machine's terminal capability profile.
   tcc [subcommand]       Run macOS privacy/FDA doctor, targets, panes, and guide.
@@ -152,6 +153,11 @@ Behavior subcommands:
   behavior install --prime [--source path|--bundle tar.gz] [--repo owner/repo] [--release tag|latest] [--yes] [--dry-run]
   behavior render --all [--dry-run]
   behavior update [--yes]
+
+Claude subcommands:
+  claude permissions status [--claude-dir path]
+  claude permissions install [--yes|--dry-run] [--claude-dir path]
+  claude permissions doctor [--claude-dir path]
 
 TCC subcommands:
   tcc status
@@ -1246,6 +1252,25 @@ tcc() {
   fi
 }
 
+claude_cmd() {
+  local sub="${1:-}"
+  shift || true
+  case "$sub" in
+    permissions)
+      local script="$GAF_ROOT/scripts/claude-permissions.zsh"
+      if [[ ! -x "$script" ]]; then
+        script="${GAF_BIN_DIR:h}/scripts/claude-permissions.zsh"
+      fi
+      if [[ ! -x "$script" ]]; then
+        script="$GAF_HOME/scripts/claude-permissions.zsh"
+      fi
+      [[ -x "$script" ]] || { print -u2 -- "claude-permissions.zsh not found"; return 1; }
+      "$script" "$@"
+      ;;
+    *) usage; return 2 ;;
+  esac
+}
+
 macos() {
   local script="$GAF_ROOT/scripts/macos-performance-restore.zsh"
   if [[ ! -x "$script" ]]; then
@@ -1284,6 +1309,7 @@ case "${1:-}" in
   macos) shift; macos "$@" ;;
   memory) shift; memory "$@" ;;
   behavior) shift; behavior "$@" ;;
+  claude) shift; claude_cmd "$@" ;;
   blackbox) shift; blackbox "$@" ;;
   profile)
     shift
