@@ -55,13 +55,22 @@ gaf behavior update --yes
 
 ## Harness Targets
 
-The prime pack currently targets managed blocks for:
+The prime pack renderer owns private managed blocks for:
 
 - Codex: `~/.codex/AGENTS.md`
 - Claude Code: `~/.claude/CLAUDE.md`
 - Gemini CLI: `~/.gemini/GEMINI.md`
 - OpenCode: `~/.config/opencode/AGENTS.md`
+- Hermes: `~/.hermes/SOUL.md`
+- Hermes Agent Ultra: `~/.hermes-agent-ultra/SOUL.md`
+- Existing Hermes profile overrides: `~/.hermes/profiles/*/SOUL.md`
+- OMP: `~/.omp/agent/AGENTS.md`
+- Droid: `~/.droid/AGENTS.md`
+- Pi Coding Agent: `~/.pi-coding-agent/AGENTS.md`
+- Ghostty Agent Forge: `~/.config/ghostty-agent-forge/AGENTS.md`
 - ContextLattice shell/hook env: `~/.contextlattice/agent_prime.env` and `~/.contextlattice/agent_hooks.env`
+
+The private renderer also emits local-only `generated/agent_prime_analysis.md` and `generated/agent_prime_analysis.json` for capability/profile/install-target review.
 
 ## Rules For Agents
 
