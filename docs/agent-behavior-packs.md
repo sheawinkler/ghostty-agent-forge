@@ -67,6 +67,7 @@ The prime pack renderer owns private managed blocks for:
 - OMP: `~/.omp/agent/AGENTS.md`
 - Droid: `~/.droid/AGENTS.md`
 - Pi Coding Agent: `~/.pi-coding-agent/AGENTS.md`
+- Mercury Agent: `~/.mercury-agent/AGENTS.md`
 - Ghostty Agent Forge: `~/.config/ghostty-agent-forge/AGENTS.md`
 - ContextLattice shell/hook env: `~/.contextlattice/agent_prime.env` and `~/.contextlattice/agent_hooks.env`
 
