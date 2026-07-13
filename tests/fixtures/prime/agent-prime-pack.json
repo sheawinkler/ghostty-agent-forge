@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "name": "contextlattice-agent-prime",
+  "version": "9.9.9",
+  "visibility": "private",
+  "allowed_github_login": "sheawinkler",
+  "policy_path": "policy/agent-prime.json",
+  "renderer": "scripts/render-agent-prime.py",
+  "description": "Sanitized test fixture with no proprietary behavior content.",
+  "requires": {
+    "ghostty_agent_forge_min": "0.2.0",
+    "contextlattice_tools": []
+  }
+}

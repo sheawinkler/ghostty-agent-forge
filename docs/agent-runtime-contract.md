@@ -28,6 +28,7 @@ Agents should run:
 gaf doctor
 gaf memory preflight
 gaf behavior status
+gaf harnesses status --json
 ```
 
 If ContextLattice is unavailable, continue from local evidence and report degraded-memory mode.
@@ -42,6 +43,12 @@ gaf behavior doctor
 ```
 
 to verify managed harness blocks and ContextLattice behavior-pack support.
+
+Authentication state, process lifecycle, privacy grants, and storage placement
+are separate runtime boundaries. Agents must identify the selected harness
+binary and state home before auth changes, the exact process before restart,
+the requesting app identity before TCC remediation, and the resolved volume
+before generating large build artifacts.
 
 ## Shell Modes
 

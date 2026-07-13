@@ -9,7 +9,11 @@ commands=(
   'macos:post-update macOS performance restore/status helpers'
   'memory:ContextLattice memory helper'
   'behavior:private behavior-pack install, render, status, and doctor'
+  'harnesses:provider-neutral agent harness coverage matrix'
+  'agents:alias for harnesses'
+  'codex:isolated Codex account homes using one binary'
   'claude:Claude Code permission hook install, status, and doctor'
+  'self:inspect or update Ghostty Agent Forge'
   'blackbox:run a command and append structured execution telemetry'
   'profile:export this machine terminal capability profile'
   'tcc:run macOS privacy/FDA doctor and pane helpers'
@@ -63,12 +67,34 @@ case $state in
         local -a behavior_cmds
         behavior_cmds=(
           'status:inspect installed behavior pack'
+          'list:list immutable installed behavior-pack versions'
           'doctor:verify behavior pack render support'
           'install:install private behavior pack'
           'render:render managed harness blocks'
           'update:update private behavior pack'
+          'rollback:activate a previous installed behavior-pack version'
         )
         _describe -t commands 'behavior command' behavior_cmds
+        ;;
+      harnesses|agents)
+        local -a harness_cmds
+        harness_cmds=(
+          'status:show binaries and Prime policy coverage'
+          'doctor:require current Prime policy across every harness'
+        )
+        _describe -t commands 'harness command' harness_cmds
+        ;;
+      codex)
+        local -a codex_cmds
+        codex_cmds=(
+          'list:list isolated Codex profiles'
+          'status:show login state for one or all profiles'
+          'add:add an isolated Codex home'
+          'login:authenticate one profile without logging out another'
+          'run:launch one profile'
+          'home:print one profile home'
+        )
+        _describe -t commands 'Codex profile command' codex_cmds
         ;;
       claude)
         local -a claude_cmds
@@ -76,6 +102,14 @@ case $state in
           'permissions:Claude Code Bash approval hook status/install/doctor'
         )
         _describe -t commands 'claude command' claude_cmds
+        ;;
+      self)
+        local -a self_cmds
+        self_cmds=(
+          'status:show installed forge version and source'
+          'update:update from a newer public forge checkout'
+        )
+        _describe -t commands 'self command' self_cmds
         ;;
       tcc)
         local -a tcc_cmds

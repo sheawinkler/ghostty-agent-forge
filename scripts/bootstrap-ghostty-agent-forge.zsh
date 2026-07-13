@@ -258,11 +258,25 @@ for completion in "$REPO_ROOT"/zsh/completions/_*; do
 done
 
 write_file "$CONFIG_ROOT/bin/gaf" "$REPO_ROOT/bin/gaf"
+write_file "$CONFIG_ROOT/VERSION" "$REPO_ROOT/VERSION"
 write_file "$CONFIG_ROOT/agent-runtime.json" "$REPO_ROOT/config/agent-runtime.json"
-for helper in bootstrap-ghostty-agent-forge contextlattice-preflight macos-tcc-doctor macos-performance-restore claude-permissions; do
+for helper in bootstrap-ghostty-agent-forge contextlattice-preflight macos-tcc-doctor macos-performance-restore claude-permissions codex-accounts self-update; do
   write_file "$CONFIG_ROOT/scripts/$helper.zsh" "$REPO_ROOT/scripts/$helper.zsh"
 done
-run chmod +x "$CONFIG_ROOT/bin/gaf" "$CONFIG_ROOT/scripts/bootstrap-ghostty-agent-forge.zsh" "$CONFIG_ROOT/scripts/contextlattice-preflight.zsh" "$CONFIG_ROOT/scripts/macos-tcc-doctor.zsh" "$CONFIG_ROOT/scripts/macos-performance-restore.zsh" "$CONFIG_ROOT/scripts/claude-permissions.zsh"
+for helper in behavior-pack agent-harnesses; do
+  write_file "$CONFIG_ROOT/scripts/$helper.py" "$REPO_ROOT/scripts/$helper.py"
+done
+run chmod +x \
+  "$CONFIG_ROOT/bin/gaf" \
+  "$CONFIG_ROOT/scripts/bootstrap-ghostty-agent-forge.zsh" \
+  "$CONFIG_ROOT/scripts/contextlattice-preflight.zsh" \
+  "$CONFIG_ROOT/scripts/macos-tcc-doctor.zsh" \
+  "$CONFIG_ROOT/scripts/macos-performance-restore.zsh" \
+  "$CONFIG_ROOT/scripts/claude-permissions.zsh" \
+  "$CONFIG_ROOT/scripts/codex-accounts.zsh" \
+  "$CONFIG_ROOT/scripts/self-update.zsh" \
+  "$CONFIG_ROOT/scripts/behavior-pack.py" \
+  "$CONFIG_ROOT/scripts/agent-harnesses.py"
 run ln -sf "$CONFIG_ROOT/bin/gaf" "$HOME/.local/bin/gaf"
 
 touch "$HOME/.zprofile" "$HOME/.zshrc"

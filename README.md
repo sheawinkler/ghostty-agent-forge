@@ -10,7 +10,7 @@ Ghostty Agent Forge bootstraps a macOS terminal workstation for agentic developm
 
 - Ghostty-first terminal setup with zsh and Homebrew.
 - Fast zsh startup with native completions, fzf-tab, zoxide, autosuggestions, and syntax highlighting.
-- Agent-safe shell behavior for Codex, Claude Code, background workers, launchd jobs, and non-TTY shells.
+- Agent-safe shell behavior across Codex, Claude Code, Gemini CLI, OpenCode, Hermes/Ultra, OMP, Droid, Pi, Mercury, background workers, launchd jobs, and non-TTY shells.
 - ContextLattice-aware defaults for memory search, preflight checks, and local agent identity.
 - macOS TCC/FDA diagnostic rules so file-access failures are not mistaken for broken zsh or Unix permissions.
 - Reproducible setup scripts for cloning the same terminal environment on another Mac.
@@ -72,6 +72,9 @@ gaf memory preflight
 gaf behavior status
 gaf behavior install --prime --yes
 gaf behavior doctor
+gaf harnesses status
+gaf codex list
+gaf self status
 gaf claude permissions status
 gaf claude permissions install --dry-run
 gaf bench 5
@@ -175,6 +178,7 @@ Install requires the authenticated GitHub login to be `sheawinkler`:
 gaf behavior install --prime --yes
 gaf behavior status
 gaf behavior doctor
+gaf harnesses doctor
 ```
 
 For local pack development:
@@ -184,6 +188,50 @@ gaf behavior install --prime --source ~/Documents/Projects/contextlattice-agent-
 ```
 
 More detail: `docs/agent-behavior-packs.md`.
+
+## Harness Coverage
+
+The forge is provider-neutral. `gaf harnesses status` reports the installed
+binary and current Prime policy projection for every supported harness; JSON is
+available for agents and CI:
+
+```zsh
+gaf harnesses status
+gaf harnesses status --json
+gaf harnesses doctor
+```
+
+Codex account profiles are a narrower convenience lane, not the behavior
+architecture. They keep multiple Codex logins in isolated state homes while
+using the same installed binary:
+
+```zsh
+gaf codex add pro ~/.codex-pro-2 --yes
+gaf codex status --all
+gaf codex login pro
+gaf codex pro
+```
+
+These helpers never log out another account and never install another Codex
+binary. More detail: `docs/agent-harnesses.md`.
+
+## Updating The Forge
+
+After the first bootstrap, update the public forge with:
+
+```zsh
+gaf self status
+gaf self update --dry-run
+gaf self update --yes
+```
+
+The updater clones the requested ref into a temporary directory, refuses
+downgrades, requires a newer `VERSION`, runs that checkout's bootstrap, and
+verifies the installed version.
+
+Installations older than `0.2.0` do not have `gaf self`; update those once from
+a fresh clone with `./scripts/bootstrap-ghostty-agent-forge.zsh`. Later upgrades
+use the self-update command.
 
 ## Claude Code Permissions
 
@@ -217,7 +265,12 @@ gaf bench 5                # zsh startup benchmark
 gaf macos status           # post-update macOS performance drift audit
 gaf macos restore --yes    # reapply safe user-level post-update settings
 gaf behavior status        # inspect installed private behavior pack
+gaf behavior list          # list immutable installed pack versions
 gaf behavior doctor        # verify private pack render and harness blocks
+gaf behavior rollback 0.2.3 --yes
+gaf harnesses status --json
+gaf codex status --all
+gaf self update --dry-run
 gaf claude permissions status
 gaf claude permissions install --yes
 gaf claude permissions doctor
@@ -246,6 +299,7 @@ zsh -ic 'whence -w _brew _docker _cargo _uv _pnpm _rg _fd _gh _zoxide'
 zsh -ic 'autoload -Uz compaudit; compaudit'
 for i in {1..5}; do /usr/bin/time -p zsh -ic exit; done
 tests/smoke.zsh
+python3 tests/public_private_boundary.py
 ```
 
 Warm startup target: under `500ms`.
@@ -342,15 +396,22 @@ sudo mdutil -i off /
 - Do not reset macOS privacy permissions unless the human explicitly approves it.
 - Diagnose TCC/FDA failures before changing Unix file permissions.
 - Use `gaf tcc targets` and `gaf tcc open <pane>` to identify and approve the responsible app or binary.
+- Keep agent accounts in isolated provider state homes; do not switch by logging out another active profile.
+- Identify exact PIDs and dependents before stopping an agent process; do not broadly kill a harness family.
 
 ## Repository Layout
 
 ```text
 ghostty-agent-forge/
+  VERSION
   README.md
   scripts/
     bootstrap-ghostty-agent-forge.zsh
     claude-permissions.zsh
+    codex-accounts.zsh
+    self-update.zsh
+    behavior-pack.py
+    agent-harnesses.py
     contextlattice-preflight.zsh
     macos-tcc-doctor.zsh
   bin/
@@ -367,6 +428,7 @@ ghostty-agent-forge/
   docs/
     agent-shell-rules.md
     agent-behavior-packs.md
+    agent-harnesses.md
     agent-runtime-contract.md
     claude-permissions.md
     contextlattice-integration.md
