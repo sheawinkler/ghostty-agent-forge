@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "name": "agent-prime-test-fixture",
+  "version": "9.9.9",
+  "test_fixture": true
+}

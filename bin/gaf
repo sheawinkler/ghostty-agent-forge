@@ -7,15 +7,21 @@ typeset -U path PATH
 path=(/opt/homebrew/bin /usr/local/bin /usr/bin /bin /usr/sbin /sbin $path)
 export PATH
 
-GAF_VERSION="0.1.0"
 GAF_HOME="${GAF_HOME:-$HOME/.config/ghostty-agent-forge}"
 GAF_STATE_DIR="${GAF_STATE_DIR:-$HOME/.local/state/ghostty-agent-forge}"
+GAF_BIN_PATH="${0:A}"
 GAF_BIN_DIR="${0:A:h}"
 
 if [[ -d "${GAF_BIN_DIR:h}/zsh" && -d "${GAF_BIN_DIR:h}/scripts" ]]; then
   GAF_ROOT="${GAF_ROOT:-${GAF_BIN_DIR:h}}"
 else
   GAF_ROOT="${GAF_ROOT:-$GAF_HOME}"
+fi
+
+if [[ -r "$GAF_ROOT/VERSION" ]]; then
+  GAF_VERSION="${GAF_VERSION:-$(<"$GAF_ROOT/VERSION")}"
+else
+  GAF_VERSION="${GAF_VERSION:-0.2.0}"
 fi
 
 CONTEXTLATTICE_ORCHESTRATOR_URL="${CONTEXTLATTICE_ORCHESTRATOR_URL:-http://127.0.0.1:8075}"
@@ -101,9 +107,10 @@ RESOURCE_LOG_DIR="${GAF_RESOURCE_LOG_DIR:-/Volumes/wd_black/ghostty-agent-forge/
 GAF_BEHAVIOR_HOME="${GAF_BEHAVIOR_HOME:-$HOME/.contextlattice/agent-packs}"
 GAF_BEHAVIOR_LINK="${GAF_BEHAVIOR_LINK:-$GAF_HOME/behavior}"
 GAF_PRIME_REPO="${GAF_PRIME_REPO:-sheawinkler/contextlattice-agent-prime}"
-GAF_PRIME_REF="${GAF_PRIME_REF:-main}"
 GAF_PRIME_RELEASE="${GAF_PRIME_RELEASE:-latest}"
 GAF_PRIME_ALLOWED_LOGIN="${GAF_PRIME_ALLOWED_LOGIN:-sheawinkler}"
+GAF_PUBLIC_REPO="${GAF_PUBLIC_REPO:-sheawinkler/ghostty-agent-forge}"
+GAF_PUBLIC_REF="${GAF_PUBLIC_REF:-main}"
 
 usage() {
   cat <<'EOF'
@@ -117,7 +124,10 @@ Commands:
   macos <subcommand>     Post-update macOS performance restore/status helpers.
   memory <subcommand>    ContextLattice memory helper.
   behavior <subcommand>  Private behavior-pack install, render, status, and doctor.
+  harnesses <subcommand> Provider-neutral agent harness coverage matrix.
+  codex <subcommand>     Isolated Codex account homes without duplicate binaries.
   claude <subcommand>    Claude Code permission hook install, status, and doctor.
+  self <subcommand>      Inspect or update Ghostty Agent Forge itself.
   blackbox -- <cmd...>   Run a command and append structured execution telemetry.
   profile export [path]  Export this machine's terminal capability profile.
   tcc [subcommand]       Run macOS privacy/FDA doctor, targets, panes, and guide.
@@ -149,10 +159,29 @@ macOS subcommands:
 
 Behavior subcommands:
   behavior status
+  behavior list
   behavior doctor
   behavior install --prime [--source path|--bundle tar.gz] [--repo owner/repo] [--release tag|latest] [--yes] [--dry-run]
   behavior render --all [--dry-run]
-  behavior update [--yes]
+  behavior update [--yes|--dry-run]
+  behavior rollback [version] [--yes|--dry-run]
+
+Harness subcommands:
+  harnesses status [--json]
+  harnesses doctor [--json]
+
+Codex subcommands:
+  codex list
+  codex status [profile|--all]
+  codex add <profile> <codex-home> --yes
+  codex login <profile>
+  codex run <profile> [-- <codex args...>]
+  codex home <profile>
+  codex <profile> [codex args...]      Shorthand for codex run.
+
+Self subcommands:
+  self status
+  self update [--yes|--dry-run] [--repo owner/repo] [--ref branch-or-tag]
 
 Claude subcommands:
   claude permissions status [--claude-dir path]
@@ -336,6 +365,9 @@ doctor() {
   else
     print_check "degraded" "health" "$CONTEXTLATTICE_ORCHESTRATOR_URL"
   fi
+
+  print
+  harnesses status || true
 
   print
   print "Resources"
@@ -773,6 +805,45 @@ behavior_current_pack() {
   return 1
 }
 
+behavior_helper() {
+  local helper="$GAF_ROOT/scripts/behavior-pack.py"
+  if [[ ! -x "$helper" ]]; then
+    helper="${GAF_BIN_DIR:h}/scripts/behavior-pack.py"
+  fi
+  if [[ ! -x "$helper" ]]; then
+    helper="$GAF_HOME/scripts/behavior-pack.py"
+  fi
+  [[ -x "$helper" ]] || { print -u2 -- "behavior-pack.py not found"; return 1; }
+  print -r -- "$helper"
+}
+
+behavior_validate_pack() {
+  local pack_dir="$1" helper
+  helper="$(behavior_helper)" || return
+  python3 "$helper" validate \
+    --pack "$pack_dir" \
+    --gaf-version "$GAF_VERSION" \
+    --allowed-login "$GAF_PRIME_ALLOWED_LOGIN"
+}
+
+behavior_verify_checksum() {
+  local archive="$1" sums="$2" helper
+  helper="$(behavior_helper)" || return
+  python3 "$helper" checksum --archive "$archive" --sums "$sums" >/dev/null
+}
+
+behavior_extract_archive() {
+  local archive="$1" destination="$2" helper
+  helper="$(behavior_helper)" || return
+  python3 "$helper" extract --archive "$archive" --dest "$destination" >/dev/null
+}
+
+behavior_tree_digest() {
+  local pack_dir="$1" helper
+  helper="$(behavior_helper)" || return
+  python3 "$helper" tree-digest --path "$pack_dir"
+}
+
 behavior_pack_version() {
   local pack_dir="$1"
   python3 - "$pack_dir/agent-prime-pack.json" <<'PY'
@@ -800,16 +871,47 @@ behavior_require_login() {
   fi
 }
 
-behavior_safe_link() {
+behavior_atomic_link() {
   local target="$1"
   local link="$2"
   mkdir -p "${link:h}"
-  if [[ -e "$link" && ! -L "$link" ]]; then
+  if [[ ( -e "$link" || -L "$link" ) && ! -L "$link" ]]; then
     print -u2 -- "refusing to replace non-symlink path: $link"
     return 1
   fi
-  rm -f "$link"
-  ln -s "$target" "$link"
+  python3 - "$target" "$link" <<'PY'
+import os, sys
+from pathlib import Path
+
+target = sys.argv[1]
+link = Path(sys.argv[2])
+temporary = link.with_name(f".{link.name}.tmp-{os.getpid()}")
+try:
+    temporary.unlink(missing_ok=True)
+    os.symlink(target, temporary)
+    os.replace(temporary, link)
+finally:
+    temporary.unlink(missing_ok=True)
+PY
+}
+
+behavior_list() {
+  print "Installed Agent Prime versions"
+  local current="" pack_dir version
+  current="$(behavior_current_pack 2>/dev/null || true)"
+  local versions=("$GAF_BEHAVIOR_HOME"/prime/<->.<->.<->(/N))
+  if (( ${#versions[@]} == 0 )); then
+    print_check "missing" "versions" "none"
+    return 0
+  fi
+  for pack_dir in "${versions[@]}"; do
+    version="${pack_dir:t}"
+    if [[ "${pack_dir:A}" == "$current" ]]; then
+      print_check "current" "$version" "$pack_dir"
+    else
+      print_check "installed" "$version" "$pack_dir"
+    fi
+  done
 }
 
 behavior_status() {
@@ -833,18 +935,7 @@ behavior_status() {
   fi
 
   print
-  print "Harness managed blocks"
-  local marker="contextlattice-agent-prime"
-  local target
-  for target in "$HOME/.codex/AGENTS.md" "$HOME/.claude/CLAUDE.md" "$HOME/.gemini/GEMINI.md" "$HOME/.config/opencode/AGENTS.md"; do
-    if [[ -f "$target" ]] && grep -q "$marker" "$target"; then
-      print_check "ok" "${target#$HOME/}" "managed block present"
-    elif [[ -f "$target" ]]; then
-      print_check "missing" "${target#$HOME/}" "managed block absent"
-    else
-      print_check "missing" "${target#$HOME/}" "file absent"
-    fi
-  done
+  harnesses status || true
 
   print
   print "ContextLattice behavior support"
@@ -889,7 +980,7 @@ behavior_render() {
 }
 
 behavior_install() {
-  local prime=0 yes=0 dry_run=0 no_render=0 source_dir="" bundle="" repo="$GAF_PRIME_REPO" ref="$GAF_PRIME_REF" release="$GAF_PRIME_RELEASE"
+  local prime=0 yes=0 dry_run=0 no_render=0 source_dir="" bundle="" repo="$GAF_PRIME_REPO" release="$GAF_PRIME_RELEASE"
   while (( $# > 0 )); do
     case "$1" in
       --prime) prime=1 ;;
@@ -910,11 +1001,6 @@ behavior_install() {
         shift
         repo="${1:-}"
         [[ -n "$repo" ]] || { print -u2 -- "missing owner/repo for --repo"; return 2; }
-        ;;
-      --ref)
-        shift
-        ref="${1:-}"
-        [[ -n "$ref" ]] || { print -u2 -- "missing ref for --ref"; return 2; }
         ;;
       --release)
         shift
@@ -940,16 +1026,19 @@ behavior_install() {
     [[ -f "$bundle" ]] || { print -u2 -- "bundle not found: $bundle"; return 1; }
     local bundle_dir="${bundle:A:h}"
     if [[ -f "$bundle_dir/SHA256SUMS" ]]; then
-      (cd "$bundle_dir" && shasum -a 256 -c SHA256SUMS)
+      behavior_verify_checksum "${bundle:A}" "$bundle_dir/SHA256SUMS"
     else
       warn "SHA256SUMS not found next to bundle; installing explicit local bundle without checksum verification"
     fi
     tmp_dir="$(mktemp -d)"
     mkdir -p "$tmp_dir/src"
-    tar -xzf "$bundle" -C "$tmp_dir/src"
+    behavior_extract_archive "${bundle:A}" "$tmp_dir/src"
     local children=("$tmp_dir"/src/*(N))
-    (( ${#children[@]} == 1 )) || { print -u2 -- "bundle must contain one root directory"; return 1; }
-    source_dir="${children[1]:A}"
+    if (( ${#children[@]} == 1 )) && [[ -d "${children[1]}" && ! -f "$tmp_dir/src/agent-prime-pack.json" ]]; then
+      source_dir="${children[1]:A}"
+    else
+      source_dir="${tmp_dir:A}/src"
+    fi
     cleanup_source=1
   else
     if (( dry_run )); then
@@ -966,10 +1055,10 @@ behavior_install() {
     else
       gh release download "$release" --repo "$repo" --pattern 'contextlattice-agent-prime-*.tar.gz' --pattern 'SHA256SUMS' --dir "$tmp_dir/release"
     fi
-    (cd "$tmp_dir/release" && shasum -a 256 -c SHA256SUMS)
     local archives=("$tmp_dir"/release/contextlattice-agent-prime-*.tar.gz(N))
     (( ${#archives[@]} == 1 )) || { print -u2 -- "expected one release tarball, found ${#archives[@]}"; return 1; }
-    tar -xzf "$archives[1]" -C "$tmp_dir/src"
+    behavior_verify_checksum "$archives[1]" "$tmp_dir/release/SHA256SUMS"
+    behavior_extract_archive "$archives[1]" "$tmp_dir/src"
     local children=("$tmp_dir"/src/*(N))
     if (( ${#children[@]} == 1 )) && [[ -d "${children[1]}" && ! -f "$tmp_dir/src/agent-prime-pack.json" ]]; then
       source_dir="${children[1]:A}"
@@ -978,11 +1067,12 @@ behavior_install() {
     fi
     cleanup_source=1
   fi
-  [[ -f "$source_dir/agent-prime-pack.json" ]] || { print -u2 -- "not an agent-prime pack: $source_dir"; return 1; }
-  [[ -x "$source_dir/scripts/render-agent-prime.py" ]] || { print -u2 -- "renderer missing or not executable: $source_dir/scripts/render-agent-prime.py"; return 1; }
-
-  local version target tmp_target
-  version="$(behavior_pack_version "$source_dir")"
+  local metadata version target tmp_target
+  metadata="$(behavior_validate_pack "$source_dir")" || {
+    (( cleanup_source )) && rm -rf "$tmp_dir"
+    return 1
+  }
+  version="$(print -r -- "$metadata" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
   target="$GAF_BEHAVIOR_HOME/prime/$version"
   tmp_target="$GAF_BEHAVIOR_HOME/prime/.tmp-$version-$$"
 
@@ -996,46 +1086,179 @@ behavior_install() {
 
   mkdir -p "$GAF_BEHAVIOR_HOME/prime"
   rm -rf "$tmp_target"
-  rsync -a --delete --exclude .git --exclude dist "$source_dir/" "$tmp_target/"
-  rm -rf "$target"
-  mv "$tmp_target" "$target"
-  behavior_safe_link "$target" "$GAF_BEHAVIOR_HOME/prime/current"
-  behavior_safe_link "$GAF_BEHAVIOR_HOME/prime/current" "$GAF_BEHAVIOR_LINK"
+  rsync -a --delete \
+    --exclude .git \
+    --exclude .DS_Store \
+    --exclude __pycache__ \
+    --exclude .pytest_cache \
+    --exclude dist \
+    --exclude generated \
+    "$source_dir/" "$tmp_target/"
+  behavior_validate_pack "$tmp_target" >/dev/null || {
+    rm -rf "$tmp_target"
+    (( cleanup_source )) && rm -rf "$tmp_dir"
+    return 1
+  }
+  local incoming_digest
+  incoming_digest="$(behavior_tree_digest "$tmp_target")" || {
+    rm -rf "$tmp_target"
+    (( cleanup_source )) && rm -rf "$tmp_dir"
+    return 1
+  }
+  if [[ -d "$target" ]]; then
+    local existing_digest
+    existing_digest="$(behavior_tree_digest "$target")"
+    if [[ "$existing_digest" != "$incoming_digest" ]]; then
+      print -u2 -- "refusing mutable version collision for Agent Prime $version"
+      rm -rf "$tmp_target"
+      (( cleanup_source )) && rm -rf "$tmp_dir"
+      return 1
+    fi
+    rm -rf "$tmp_target"
+  else
+    mv "$tmp_target" "$target"
+  fi
+
+  local old_current="" old_behavior=""
+  [[ -L "$GAF_BEHAVIOR_HOME/prime/current" ]] && old_current="$(readlink "$GAF_BEHAVIOR_HOME/prime/current")"
+  [[ -L "$GAF_BEHAVIOR_LINK" ]] && old_behavior="$(readlink "$GAF_BEHAVIOR_LINK")"
+  behavior_atomic_link "$target" "$GAF_BEHAVIOR_HOME/prime/current"
+  behavior_atomic_link "$GAF_BEHAVIOR_HOME/prime/current" "$GAF_BEHAVIOR_LINK"
   (( cleanup_source )) && rm -rf "$tmp_dir"
   log "installed behavior pack $version at $target"
   if (( ! no_render )); then
-    behavior_render --all
+    if ! behavior_render --all; then
+      warn "render failed; restoring previous behavior-pack links"
+      if [[ -n "$old_current" ]]; then
+        behavior_atomic_link "$old_current" "$GAF_BEHAVIOR_HOME/prime/current"
+      else
+        rm -f "$GAF_BEHAVIOR_HOME/prime/current"
+      fi
+      if [[ -n "$old_behavior" ]]; then
+        behavior_atomic_link "$old_behavior" "$GAF_BEHAVIOR_LINK"
+      else
+        rm -f "$GAF_BEHAVIOR_LINK"
+      fi
+      if [[ -n "$old_current" ]] && ! behavior_render --all >/dev/null; then
+        warn "previous behavior pack was restored but its managed blocks could not be re-rendered"
+      fi
+      return 1
+    fi
   fi
 }
 
 behavior_doctor() {
   behavior_status
   print
-  print "Behavior render dry run"
-  local pack_dir
+  print "Behavior pack contract"
+  local pack_dir metadata
   if pack_dir="$(behavior_current_pack 2>/dev/null)"; then
-    if behavior_render --all --dry-run >/tmp/gaf-behavior-render.json; then
-      print_check "ok" "render_dry_run" "/tmp/gaf-behavior-render.json"
+    if metadata="$(behavior_validate_pack "$pack_dir" 2>&1)"; then
+      print_check "ok" "pack_contract" "$metadata"
     else
-      print_check "fail" "render_dry_run" "renderer failed"
+      print_check "fail" "pack_contract" "$metadata"
       return 1
     fi
   else
-    print_check "missing" "render_dry_run" "prime pack not installed"
+    print_check "missing" "pack_contract" "prime pack not installed"
+    return 1
   fi
+
+  print
+  print "Behavior render dry run"
+  local render_result
+  render_result="$(mktemp "${TMPDIR:-/tmp}/gaf-behavior-render.XXXXXX")"
+  if behavior_render --all --dry-run >"$render_result" \
+    && python3 -m json.tool "$render_result" >/dev/null; then
+    print_check "ok" "render_dry_run" "$render_result"
+  else
+    print_check "fail" "render_dry_run" "renderer failed or returned invalid JSON"
+    rm -f "$render_result"
+    return 1
+  fi
+  rm -f "$render_result"
+
+  print
+  harnesses doctor
 }
 
 behavior_update() {
-  local yes=0
+  local yes=0 dry_run=0
   while (( $# > 0 )); do
     case "$1" in
       --yes|-y) yes=1 ;;
+      --dry-run) dry_run=1 ;;
       *) print -u2 -- "unknown behavior update arg: $1"; return 2 ;;
     esac
     shift
   done
+  (( dry_run )) && { behavior_install --prime --dry-run; return; }
   (( yes )) || { print -r -- "Re-run with --yes to update the private behavior pack."; return 2; }
   behavior_install --prime --yes
+}
+
+behavior_rollback() {
+  local requested="" yes=0 dry_run=0
+  while (( $# > 0 )); do
+    case "$1" in
+      --yes|-y) yes=1 ;;
+      --dry-run) dry_run=1 ;;
+      -*) print -u2 -- "unknown behavior rollback arg: $1"; return 2 ;;
+      *)
+        [[ -z "$requested" ]] || { print -u2 -- "only one rollback version may be specified"; return 2; }
+        requested="$1"
+        ;;
+    esac
+    shift
+  done
+  behavior_require_login
+  local current current_version target version
+  current="$(behavior_current_pack)" || { print -u2 -- "prime behavior pack is not installed"; return 1; }
+  current_version="$(behavior_pack_version "$current")"
+  if [[ -n "$requested" ]]; then
+    version="$requested"
+  else
+    version="$(python3 - "$GAF_BEHAVIOR_HOME/prime" "$current_version" <<'PY'
+import re, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+current = sys.argv[2]
+current_key = tuple(map(int, current.split(".")))
+versions = []
+for child in root.iterdir() if root.is_dir() else ():
+    if child.is_dir() and not child.is_symlink() and re.fullmatch(r"\d+\.\d+\.\d+", child.name):
+        versions.append(child.name)
+versions.sort(key=lambda value: tuple(map(int, value.split("."))), reverse=True)
+print(next((value for value in versions if tuple(map(int, value.split("."))) < current_key), ""))
+PY
+)"
+  fi
+  [[ -n "$version" ]] || { print -u2 -- "no previous installed Agent Prime version is available"; return 1; }
+  target="$GAF_BEHAVIOR_HOME/prime/$version"
+  [[ -d "$target" && ! -L "$target" ]] || { print -u2 -- "rollback target is not an installed immutable version: $target"; return 1; }
+  behavior_validate_pack "$target" >/dev/null
+  if (( dry_run )); then
+    print -r -- "would roll back Agent Prime $current_version -> $version"
+    print -r -- "would render managed harness blocks from $target"
+    return 0
+  fi
+  (( yes )) || { print -r -- "Re-run with --yes to roll back Agent Prime $current_version -> $version."; return 2; }
+
+  local old_current="" old_behavior=""
+  [[ -L "$GAF_BEHAVIOR_HOME/prime/current" ]] && old_current="$(readlink "$GAF_BEHAVIOR_HOME/prime/current")"
+  [[ -L "$GAF_BEHAVIOR_LINK" ]] && old_behavior="$(readlink "$GAF_BEHAVIOR_LINK")"
+  behavior_atomic_link "$target" "$GAF_BEHAVIOR_HOME/prime/current"
+  behavior_atomic_link "$GAF_BEHAVIOR_HOME/prime/current" "$GAF_BEHAVIOR_LINK"
+  if ! behavior_render --all; then
+    warn "rollback render failed; restoring previous behavior-pack links"
+    [[ -n "$old_current" ]] && behavior_atomic_link "$old_current" "$GAF_BEHAVIOR_HOME/prime/current"
+    [[ -n "$old_behavior" ]] && behavior_atomic_link "$old_behavior" "$GAF_BEHAVIOR_LINK"
+    if [[ -n "$old_current" ]] && ! behavior_render --all >/dev/null; then
+      warn "previous behavior pack was restored but its managed blocks could not be re-rendered"
+    fi
+    return 1
+  fi
+  log "rolled back Agent Prime $current_version -> $version"
 }
 
 behavior() {
@@ -1043,10 +1266,12 @@ behavior() {
   shift || true
   case "$sub" in
     status) behavior_status "$@" ;;
+    list) behavior_list "$@" ;;
     doctor) behavior_doctor "$@" ;;
     install) behavior_install "$@" ;;
     render) behavior_render "$@" ;;
     update) behavior_update "$@" ;;
+    rollback) behavior_rollback "$@" ;;
     *) usage; return 2 ;;
   esac
 }
@@ -1252,6 +1477,70 @@ tcc() {
   fi
 }
 
+harnesses() {
+  local script="$GAF_ROOT/scripts/agent-harnesses.py"
+  if [[ ! -x "$script" ]]; then
+    script="${GAF_BIN_DIR:h}/scripts/agent-harnesses.py"
+  fi
+  if [[ ! -x "$script" ]]; then
+    script="$GAF_HOME/scripts/agent-harnesses.py"
+  fi
+  [[ -x "$script" ]] || { print -u2 -- "agent-harnesses.py not found"; return 1; }
+  (( $# > 0 )) || set -- status
+  GAF_BEHAVIOR_HOME="$GAF_BEHAVIOR_HOME" \
+    GAF_BEHAVIOR_LINK="$GAF_BEHAVIOR_LINK" \
+    GAF_HOME="$GAF_HOME" \
+    python3 "$script" "$@"
+}
+
+codex_cmd() {
+  local requested_subcommand="${1:-}"
+  local requested_profile="${2:-}"
+  local script="$GAF_ROOT/scripts/codex-accounts.zsh"
+  if [[ ! -x "$script" ]]; then
+    script="${GAF_BIN_DIR:h}/scripts/codex-accounts.zsh"
+  fi
+  if [[ ! -x "$script" ]]; then
+    script="$GAF_HOME/scripts/codex-accounts.zsh"
+  fi
+  [[ -x "$script" ]] || { print -u2 -- "codex-accounts.zsh not found"; return 1; }
+  GAF_HOME="$GAF_HOME" "$script" "$@" || return
+  if [[ "$requested_subcommand" == "add" ]] && behavior_current_pack >/dev/null 2>&1; then
+    behavior_render --all >/dev/null || return
+    if harnesses status --json 2>/dev/null | PROFILE="$requested_profile" python3 -c '
+import json, os, sys
+profile_id = "codex-profile-" + os.environ["PROFILE"]
+payload = json.load(sys.stdin)
+raise SystemExit(0 if any(
+    item.get("id") == profile_id and item.get("policy_state") == "current"
+    for item in payload.get("harnesses", [])
+) else 1)
+'
+    then
+      log "rendered Agent Prime into Codex profile '$requested_profile'"
+    else
+      warn "the installed behavior pack did not project into Codex profile '$requested_profile'; update Agent Prime"
+      return 1
+    fi
+  fi
+}
+
+self_cmd() {
+  local script="$GAF_ROOT/scripts/self-update.zsh"
+  if [[ ! -x "$script" ]]; then
+    script="${GAF_BIN_DIR:h}/scripts/self-update.zsh"
+  fi
+  if [[ ! -x "$script" ]]; then
+    script="$GAF_HOME/scripts/self-update.zsh"
+  fi
+  [[ -x "$script" ]] || { print -u2 -- "self-update.zsh not found"; return 1; }
+  GAF_VERSION="$GAF_VERSION" \
+    GAF_PUBLIC_REPO="$GAF_PUBLIC_REPO" \
+    GAF_PUBLIC_REF="$GAF_PUBLIC_REF" \
+    GAF_CALLER_BIN="$GAF_BIN_PATH" \
+    "$script" "$@"
+}
+
 claude_cmd() {
   local sub="${1:-}"
   shift || true
@@ -1309,7 +1598,10 @@ case "${1:-}" in
   macos) shift; macos "$@" ;;
   memory) shift; memory "$@" ;;
   behavior) shift; behavior "$@" ;;
+  harnesses|agents) shift; harnesses "$@" ;;
+  codex) shift; codex_cmd "$@" ;;
   claude) shift; claude_cmd "$@" ;;
+  self) shift; self_cmd "$@" ;;
   blackbox) shift; blackbox "$@" ;;
   profile)
     shift

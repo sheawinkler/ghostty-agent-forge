@@ -46,12 +46,22 @@ Install locations:
 
 ```zsh
 gaf behavior status
+gaf behavior list
 gaf behavior doctor
 gaf behavior render --all
+gaf behavior update --dry-run
 gaf behavior update --yes
+gaf behavior rollback <version> --dry-run
+gaf behavior rollback <version> --yes
 ```
 
 `render --all` delegates to the installed private pack renderer. The renderer should use managed blocks so existing harness files are preserved.
+
+Pack versions are immutable. GAF rejects a different tree using an already
+installed version, validates the pack manifest and minimum compatible GAF
+version, rejects unsafe archive members, and atomically switches the `current`
+links. A failed render restores the previous links. Installed versions remain
+available for explicit rollback.
 
 ## Harness Targets
 
@@ -79,3 +89,5 @@ The private renderer also emits local-only `generated/agent_prime_analysis.md` a
 - Do not replace full user harness files; write managed blocks only.
 - Keep always-loaded behavior compact and point to ContextLattice for expanded context.
 - Run `gaf behavior doctor` after install or update.
+- Use `gaf harnesses doctor` to verify every provider projection, not only one harness.
+- Never change authentication state as a side effect of installing or rendering behavior.
