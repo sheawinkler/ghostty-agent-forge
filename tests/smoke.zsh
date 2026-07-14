@@ -44,6 +44,24 @@ HEADLESS_MARKER="$HEADLESS_MARKER" PATH="$HEADLESS_BIN:$PATH" ROOT="$ROOT" zsh -
 '
 [[ ! -e "$HEADLESS_MARKER" ]]
 
+# Exercise the exact headless interactive-login shape used by delegated agents.
+HEADLESS_ZDOTDIR="$TEST_ROOT/headless-zdotdir"
+mkdir -p "$HEADLESS_ZDOTDIR"
+cat > "$HEADLESS_ZDOTDIR/.zshrc" <<'EOF'
+set -u
+export PATH="$HEADLESS_BIN:$PATH"
+source "$ROOT/zsh/tools.zsh"
+unset SPACESHIP_PROMPT_ASYNC
+source "$ROOT/zsh/prompt-spaceship.zsh"
+[[ -z "${SPACESHIP_PROMPT_ASYNC+x}" ]]
+EOF
+HEADLESS_BIN="$HEADLESS_BIN" HEADLESS_MARKER="$HEADLESS_MARKER" \
+  ROOT="$ROOT" ZDOTDIR="$HEADLESS_ZDOTDIR" \
+  /bin/zsh -lic 'print -r -- headless-login-ok' </dev/null \
+  >"$TEST_ROOT/headless-login.out" 2>"$TEST_ROOT/headless-login.err"
+grep -qx "headless-login-ok" "$TEST_ROOT/headless-login.out"
+[[ ! -e "$HEADLESS_MARKER" ]]
+
 "$GAF" rules >/dev/null
 "$GAF" doctor >"$TEST_ROOT/doctor.out"
 grep -q "Ghostty Agent Forge doctor" "$TEST_ROOT/doctor.out"
