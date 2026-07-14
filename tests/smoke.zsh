@@ -26,6 +26,24 @@ python3 -m json.tool "$ROOT/config/agent-runtime.json" >/dev/null
 python3 "$ROOT/tests/public_private_boundary.py"
 [[ "$(<"$ROOT/VERSION")" == "$($GAF version)" ]]
 
+HEADLESS_BIN="$TEST_ROOT/headless-bin"
+HEADLESS_MARKER="$TEST_ROOT/direnv-invoked"
+mkdir -p "$HEADLESS_BIN"
+cat > "$HEADLESS_BIN/direnv" <<'EOF'
+#!/bin/sh
+: > "$HEADLESS_MARKER"
+printf '%s\n' 'true'
+EOF
+chmod +x "$HEADLESS_BIN/direnv"
+HEADLESS_MARKER="$HEADLESS_MARKER" PATH="$HEADLESS_BIN:$PATH" ROOT="$ROOT" zsh -fc '
+  set -u
+  source "$ROOT/zsh/tools.zsh"
+  unset SPACESHIP_PROMPT_ASYNC
+  source "$ROOT/zsh/prompt-spaceship.zsh"
+  [[ -z "${SPACESHIP_PROMPT_ASYNC+x}" ]]
+'
+[[ ! -e "$HEADLESS_MARKER" ]]
+
 "$GAF" rules >/dev/null
 "$GAF" doctor >"$TEST_ROOT/doctor.out"
 grep -q "Ghostty Agent Forge doctor" "$TEST_ROOT/doctor.out"
@@ -138,7 +156,7 @@ assert profiles["codex-profile-pro"]["policy_state"] == "current"
 PY
 
 "$GAF" self status >"$TEST_ROOT/self-status.out"
-grep -q "version  0.2.0" "$TEST_ROOT/self-status.out"
+grep -q "version  0.2.1" "$TEST_ROOT/self-status.out"
 "$GAF" self update --dry-run >"$TEST_ROOT/self-update.out"
 grep -q "would clone" "$TEST_ROOT/self-update.out"
 

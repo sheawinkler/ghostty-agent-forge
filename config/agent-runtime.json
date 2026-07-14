@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "name": "ghostty-agent-forge",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "display_name": "Ghostty Agent Forge by ContextLattice",
   "purpose": "Terminal visibility, zsh/Homebrew bootstrap, and ContextLattice hooks for local AI agents on macOS.",
   "platform": {

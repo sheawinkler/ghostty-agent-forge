@@ -1,11 +1,15 @@
 # Lightweight interactive tool hooks. Keep expensive runtimes lazy.
+# Headless login shells still need PATH and helper functions, but must not run
+# cwd-triggered hooks such as direnv or initialize terminal-only navigation.
 
-if (( $+commands[zoxide] )); then
-  eval "$(zoxide init zsh)"
-fi
+if [[ -o interactive && -t 0 && -t 1 ]]; then
+  if (( $+commands[zoxide] )); then
+    eval "$(zoxide init zsh)"
+  fi
 
-if (( $+commands[direnv] )); then
-  eval "$(direnv hook zsh)"
+  if (( $+commands[direnv] )); then
+    eval "$(direnv hook zsh)"
+  fi
 fi
 
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
@@ -19,4 +23,3 @@ nvm() {
     return 127
   fi
 }
-
